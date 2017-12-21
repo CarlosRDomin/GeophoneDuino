@@ -1,0 +1,83 @@
+<!doctype html>
+
+<html lang="en">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script> 
+<script>window.jQuery || document.write("<script src='lib/jquery/jquery.min.js'><\/script>")</script>
+<head>
+	<style>th{text-align: right;} td{text-align: left;} h3{margin-bottom: 12px;}</style>
+    <meta charset="utf-8">
+
+    <title>WiFi secret config</title>
+    <meta name="author" content="Carlitos Ruiz">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+	<h1>WiFi secret config</h1>
+	<table class="center">
+		<tr><th>SoftAP config:</th><td id="apCurrConfig">SSID (softAPIP)</td></tr>
+		<tr><th>WLAN config:</th><td id="wlanCurrConfig">SSID (localIP)</td></tr>
+	</table>
+	<br>
+	<form method="POST" action="WiFiSave">
+		<h3>Select WLAN network to connect to:</h3>
+		<div id="tableWiFiNets" style="display: none">
+			<table class="center">
+				<tr><th>SSID:</th><td id="tdFormSSID">
+					<div id="divFormSSID"><div id="formSSIDnetsAvail"><select name="ssidDropdown" id="ssidDropdown" style="height: 18pt; width: 100%;"></select><br> or <br><input type="checkbox" name="ssidManualChk" id="ssidManualChk"> <label for="ssidManualChk">Manual SSID:</label> </div>
+					<div id="formSSIDnoNetsAvail">No WLAN networks found, gonna have to enter SSID manually:<br><input type="hidden" name="ssidManualChk" value="on"/></div></div>
+					<input type="text" placeholder="Network SSID" name="ssidManualTxt" id="ssidManualTxt" value="" onKeyDown="javascript: $('#ssidManualChk').val(true)" onchange="onManualSSIDchange"/></td></tr>
+				<tr><th>Password:</th><td><input type="password" placeholder="password" name="pass" id="pass" value=""/></td></tr>
+				<tr><th>Static IP:</th><td><input type="text" placeholder="Static IP" name="ip" id="ip" value=""/></td></tr>
+				<tr><th>Gateway:</th><td><input type="text" placeholder="Gateway" name="gateway" id="gateway" value=""/></td></tr>
+				<tr><th>Net mask:</th><td><input type="text" placeholder="Net mask" name="mask" id="mask" value=""/></td></tr>
+			</table>
+			<p><input type="submit" value="Connect/Disconnect"/></p>
+		</div>
+		<div id="showLoading"><img alt="Loading..." src="img/loading_spinner.gif"></div>
+	</form>
+
+    <script language="javascript">
+		var timeoutGetWiFiNets = setInterval(getWiFiNets, 3000);
+		
+		function getWiFiNets() {
+			$.getJSON("/WiFiNets", function (data) {
+				$("#apCurrConfig").html(data.currAP.ssid + " (" + data.currAP.ip + ")");
+				$("#wlanCurrConfig").html(data.currWLAN.ssid + " (" + data.currWLAN.ip + ")");
+
+				var inHTML = '';
+				if (data.nets.length > 0) {
+					inHTML = '<select name="ssidDropdown" style="height: 18pt; width: 100%;">';
+					for (i=0; i<data.nets.length; i++) {
+						inHTML += "<option value='" + data.nets[i].ssid + "'" + ((data.nets[i].ssid==data.currWLAN.ssid)? " selected":"") + ">" + ((data.nets[i].secure==7/*ENC_TYPE_NONE=7*/)? "&nbsp;&#10004;&nbsp;&nbsp; ":"&#128274; ") + data.nets[i].ssid + " [" + data.nets[i].rssi + "dBm, #" + data.nets[i].channel + "]</option>";
+					}
+					inHTML += '</select><br> or <br><input type="checkbox" name="ssidManualChk" id="ssidManualChk"> <label for="ssidManualChk">Manual SSID:</label>';
+
+					if (timeoutGetWiFiNets) clearInterval(timeoutGetWiFiNets);	// Got the data, no need to retry :)
+					timeoutGetWiFiNets = null;
+				} else {
+					inHTML = 'No WLAN networks found, gonna have to enter SSID manually:<br><input type="hidden" name="ssidManualChk" value="on"/>';
+				}
+				$("#divFormSSID").html(inHTML);
+				
+				$("#ssidManualTxt").val(data.currWLAN.ssid);
+				$("#ssidManualTxt").on('change keydown paste input', onManualSSIDchange);
+				$("#pass").val(data.currWLAN.pass);
+				$("#ip").val(data.currWLAN.ip);
+				$("#gateway").val(data.currWLAN.gateway);
+				$("#mask").val(data.currWLAN.mask);
+				
+				$("#tableWiFiNets").show();
+				$("#showLoading").hide();
+				
+			});
+		}
+		
+		function onManualSSIDchange() {
+			$("#ssidManualChk").val('on');
+			$("#ssidManualChk").prop('checked', true);
+		}
+    </script>
+</body>
+</html>

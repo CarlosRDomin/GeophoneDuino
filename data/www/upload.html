@@ -1,0 +1,40 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Secret file uploader</title>
+    <meta name="author" content="Carlitos Ruiz">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <h1>Secret file uploader</h1>
+    <form method="POST" action="secretUpload" enctype="multipart/form-data">
+    	<p>New file name: <input type="text" placeholder="/" name="fileName" value="" /><br>
+    	<input type="file" name="fileContent" value="" /><br>
+    	<input type="submit" value="Upload file" /></p>
+    </form>
+    <br>
+    <div id="resultPrevUpload"></div>
+
+    <script language="javascript">
+		function get_URL_params() {
+			var queryDict = {};
+			location.search.substr(1).split("&").forEach(function(item) {queryDict[item.split("=")[0]] = item.split("=")[1]});
+			return queryDict;
+		}
+		
+		var args = get_URL_params();
+		if (args["f"]) {
+			if (args["ok"] && args["ok"]=="1") {
+				document.getElementById("resultPrevUpload").innerHTML = "<b>Successfully</b> uploaded the file <b>" + args["f"] + "</b>! :)";
+			} else {
+				document.getElementById("resultPrevUpload").innerHTML = "<b>Sorry</b>, something went wrong uploading the file <b>" + args["f"] + "</b>! =(";
+			}
+		}
+    </script>
+</body>
+</html>

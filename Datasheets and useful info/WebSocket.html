@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Test WebSockets</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+<input type="text" id="serverIp" value="carlitos8266-d71cae.local">
+<input type="text" id="serverPort" value="81">
+<input type="button" onClick="javascript: initWebSocket();" value="Inicializa el webSocket">
+<input type="button" onClick="javascript: closeWebSocket(); adjustValue1(document.getElementById('serverPort').value);" value="Cierra el webSocket">
+<br><br>
+<div id="PlotlyGraph" style="width: 600px; height: 400px;"><!-- Plotly chart will be drawn inside this DIV --></div>
+<br>
+<textarea cols="200" rows="30" id="miTextArea"></textarea>
+<script type="application/javascript">
+var webSocket = null;
+var refreshGraph = 0;
+
+function showErrorMsg(err) {
+	console.log("Error en el WebSocket: " + err);
+	alert("Error en el WebSocket!\n" + err);
+}
+
+function initWebSocket() {
+	closeWebSocket();
+	try {
+		webSocket = new WebSocket("ws://" + document.getElementById('serverIp').value + ":" + document.getElementById('serverPort').value);
+		webSocket.onerror = showErrorMsg;
+		webSocket.onmessage = function (event) {
+			// document.getElementById('miTextArea').value += event.data + '\n';
+			// document.getElementById('miTextArea').scrollTop = document.getElementById('miTextArea').scrollHeight;
+			refreshGraph = (refreshGraph+1) % 5;
+			graph_data[0]['y'] = event.data.split(',');
+			if (refreshGraph==0) Plotly.redraw('PlotlyGraph');
+			// console.log("Mensaje recibido: " + event.data);
+		}
+    } catch (err) {
+		showErrorMsg(err);
+    }
+}
+
+function closeWebSocket() {
+	if (webSocket != null) {
+		webSocket.close();
+	}
+}
+
+var eje_x = [], eje_y = [];
+var Fs = 12000, N_FFT = 64;
+for (i=0; i<=N_FFT/2; i++) { eje_x.push(i*Fs/N_FFT + " Hz"); eje_y.push(i); }
+var graph_data = [{
+	x: eje_x,
+	y: eje_y,
+	type: 'bar'
+}];
+Plotly.newPlot('PlotlyGraph', graph_data, {yaxis:{range: [0, 1000]}});
+
+function adjustValue1(value) {
+	document.getElementById('PlotlyGraph').data;
+	graph_data[0]['y'][0] = value;
+	Plotly.addTraces('PlotlyGraph', graph_data);
+	Plotly.deleteTraces('PlotlyGraph', 0);
+	//Plotly.redraw('PlotlyGraph');
+}
+</script>
+</body>
+</html>

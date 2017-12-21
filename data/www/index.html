@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+
+<!-- Plotly.js and jQuery -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<!-- Local backup for Plotly.js and jQuery -->
+<script>window.Plotly || document.write('<script src="lib/plotly/plotly.min.js"><\/script>')</script>
+<script>window.jQuery || document.write('<script src="lib/jquery/jquery.min.js"><\/script>')</script>
+
+<script>
+	var GRAPH_ID = "geophone-graph";
+	var F_SAMP = 10000, X_RANGE_IN_SEC = 1;
+	var arrData = {x_millis: [], x: [], y: []};
+	var ws;
+	
+	function createWebSocket(connectTo) {
+		ws = new WebSocket(connectTo);
+		ws.hasReceivedAnyMessagesYet = false;
+		
+		ws.onopen = function() {
+			// Web Socket is connected
+			console.log("Successfully connected to " + ws.url);
+		};
+
+		ws.onmessage = function(evt) {
+			if (!ws.hasReceivedAnyMessagesYet) {
+				Plotly.relayout(GRAPH_ID, {
+					title: evt.data,
+					'yaxis.range': [0, 4095]
+				});
+				ws.hasReceivedAnyMessagesYet = true;
+				return;
+			}
+			
+			var geophoneVal = JSON.parse(evt.data);
+			var now = Date.now();
+			
+			arrData.x_millis.push(now);
+			arrData.x.push((now - arrData.x_millis[0])/1000.0);
+			arrData.y.pushArray(geophoneVal);
+			
+			//dataUpdateGraph();
+		};
+
+		ws.onclose = function() { 
+		  // websocket is closed.
+		};
+
+		ws.onerror = function(err) {
+			console.log("Error in webSocket!");
+		};
+		
+		return ws;
+	}
+	
+	function wsClose() {
+		if (ws) {
+			ws.close();
+		}
+		ws = null;
+	}
+	
+	function wsReconnect() {
+		wsClose();
+		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
+	}
+	
+	function dataUpdateGraph() {
+		if (!ws || ws.readyState !== ws.OPEN) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
+		var len = arrData.y.length;
+		var nowInSecs = arrData.x[len-1];
+
+		Plotly.update(GRAPH_ID, {
+			//x: [arrData.x],
+			y: [arrData.y]
+		}, {
+			//'xaxis.range': [nowInSecs-X_RANGE_IN_SEC, nowInSecs]
+			'xaxis.range': [len-X_RANGE_IN_SEC*F_SAMP, len]
+		});
+	}
+	
+	function dataDownload() {
+		var title = $("#" + GRAPH_ID)[0].layout.title;
+        var filename = title + '.csv';
+		
+		var delimiter = '\n';
+        var csv = arrData.y.join(delimiter);
+        if (csv == null) return;
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        var data = encodeURI(csv);
+
+        var link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        link.click();
+	}
+	
+	function dataClear() {
+		arrData.x_millis = [];
+		arrData.x = [];
+		arrData.y = [];
+		Plotly.restyle(GRAPH_ID, {
+			//x: [arrData.x],
+			y: [arrData.y]
+		});
+	}
+	
+	// Helper function that allows pushing an array to an existing array
+	Array.prototype.pushArray = function(arr) {
+		this.push.apply(this, arr);
+	};
+
+	$(document).ready(function() {
+		Plotly.plot(GRAPH_ID, [{
+			y: [],
+			mode: 'lines',
+			'line.color': '#80CAF6'
+		}]);
+		setInterval(dataUpdateGraph, 50);  // 20Hz refresh rate
+
+		var DEFAULT_HOST = "192.168.43.100"; // window.location.hostname;
+		var DEFAULT_PORT = 81;
+		$('#wsHost')[0].value = DEFAULT_HOST;
+		$('#wsPort')[0].value = DEFAULT_PORT;
+		wsReconnect();
+	});
+</script>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Real-time geophone signal</title>
+    <meta name="author" content="PEI Lab">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
+	<div id="geophone-graph" style="width: 600px; height: 400px;"></div>
+	<p><input type="button" value="Clear data" style="width: 100px;" onClick="javascript: dataClear();"><input type="button" value="Save data" style="margin-left: 10px; width: 100px;" onClick="javascript: dataDownload();"></p>
+</body>
+</html>

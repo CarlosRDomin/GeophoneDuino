@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+
+<!-- Highcharts JS and plugins -->
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/modules/exporting.js"></script>
+<script src="http://code.highcharts.com/modules/offline-exporting.js"></script>
+<script src="http://code.highcharts.com/modules/no-data-to-display.js"></script>
+<!-- Local backup for Highcharts JS and plugins -->
+<script>window.Highcharts || document.write('<script src="lib/highcharts/highcharts.js"><\/script>')</script>
+<script>window.Highcharts || document.write('<script src="lib/highcharts/exporting.js"><\/script>')</script>
+<script>window.Highcharts || document.write('<script src="lib/highcharts/offline-exporting.js"><\/script>')</script>
+<script>window.Highcharts || document.write('<script src="lib/highcharts/no-data-to-display.js"><\/script>')</script>
+
+<script>
+	var GRAPH_ID = "geophone-graph";
+	var X_RANGE_IN_SEC = 2000;// 2;
+	var arrData = {x_millis: [], x: [], y: []};
+	var ws;
+	var chart;
+	
+	function createWebSocket(connectTo) {
+		ws = new WebSocket(connectTo);
+		ws.hasReceivedAnyMessagesYet = false;
+		
+		ws.onopen = function() {
+			// Web Socket is connected
+			console.log("Successfully connected to " + ws.url);
+		};
+
+		ws.onmessage = function(evt) {
+			if (!ws.hasReceivedAnyMessagesYet) {
+				chart.title.textSetter(evt.data);
+				ws.hasReceivedAnyMessagesYet = true;
+				return;
+			}
+			
+			var geophoneVal = JSON.parse(evt.data);
+			var now = Date.now();
+			var nowArray = [];
+			var Fs = 10000/1000;	// 10kHz, divided by 1000 to convert to ms instead of s
+			for(var i=0; i<geophoneVal.length; i++) nowArray.push(now - (geophoneVal.length-i)/Fs);
+			
+			arrData.x_millis.push(now);
+			arrData.x.push((now - arrData.x_millis[0])/1000.0);
+			arrData.y.pushArray(geophoneVal);
+			
+			
+			var series = chart.series[0];
+			series.addPoint(geophoneVal);
+			//series.addPoint(nowArray.combine(geophoneVal), false);
+			//series.addPoint([x,4095*y], true, false);
+			//series.xAxis.setExtremes(Math.max(series.xData[0],now-3000), now);
+			
+			//dataUpdateGraph();
+		};
+
+		ws.onclose = function() { 
+		  // websocket is closed.
+		};
+
+		ws.onerror = function(err) {
+			console.log("Error in webSocket!");
+		};
+		
+		return ws;
+	}
+	
+	function wsClose() {
+		if (ws) {
+			ws.close();
+		}
+		ws = null;
+	}
+	
+	function wsReconnect() {
+		wsClose();
+		ws = createWebSocket("ws://" + document.getElementById('wsHost').value + ":" + document.getElementById('wsPort').value + "/geophone");
+	}
+	
+	function dataUpdateGraph() {
+		if (!ws || ws.readyState !== ws.OPEN) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
+		/*var len = arrData.y.length;
+		var nowInSecs = arrData.x[len-1];
+		
+		Plotly.update(GRAPH_ID, {
+			//x: [arrData.x],
+			y: [arrData.y]
+		}, {
+			//'xaxis.range': [nowInSecs-X_RANGE_IN_SEC, nowInSecs]
+			'xaxis.range': [len-X_RANGE_IN_SEC, len]
+		});*/
+		var series = chart.series[0];
+		var now = Date.now();
+		series.xAxis.setExtremes(Math.max(series.xData[0],now-3000), now);
+		chart.redraw();
+	}
+	
+	function dataClear() {
+		arrData.x_millis = [];
+		arrData.x = [];
+		arrData.y = [];
+		
+		// Clear graph too
+		var seriesLength = chart.series.length;
+        for (var i = seriesLength-1; i>-1; i--) {
+            chart.series[i].remove();
+        }
+	}
+	
+	// Helper function that allows pushing an array to an existing array
+	Array.prototype.pushArray = function(arr) {
+		this.push.apply(this, arr);
+	};
+	
+	// Helper function that allows merging two arrays into a single, 2D array
+	Array.prototype.combine = function(arr) {
+		return this.map(function(v,i) {
+			return [v, arr[i]];
+			return {x: v, y: arr[i]};
+		});
+	};
+	
+	function onDocumentReady() {
+		createGraph();
+		//setInterval(dataUpdateGraph, 500);  // 20Hz refresh rate
+
+		var DEFAULT_HOST = "192.168.0.100"; // window.location.hostname;
+		var DEFAULT_PORT = 81;
+		document.getElementById('wsHost').value = (window.location.hostname !== '')? window.location.hostname : DEFAULT_HOST;
+		document.getElementById('wsPort').value = DEFAULT_PORT;
+		//wsReconnect();
+	}
+	
+	function createGraph() {
+		Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+        
+        chart = new Highcharts.Chart({
+            chart: {
+                renderTo: GRAPH_ID,
+                type: 'spline',
+                animation: false,
+                marginRight: 10,
+                /*events: {
+                    load: function() {
+    
+                        // set up the updating of the chart each second
+                        var series = this.series[0];
+                        setInterval(function() {
+                            var x = (new Date()).getTime(), // current time
+                                y = Math.random();
+                            series.addPoint([x, y], true, false);
+                            series.xAxis.setExtremes(Math.max(series.xData[0],x-3000), x);
+                        }, 10);
+                    }
+                }*/
+            },
+            credits: {
+                enabled: false
+            },
+            title: {
+                text: 'Geophone data'
+            },
+            xAxis: {
+                type: 'datetime',
+                tickPixelInterval: 150
+            },
+            yAxis: {
+                title: {
+                    text: 'Amplitude (0-4096)'
+                },
+				min: 0,
+				max: 4095,
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080' //'#80CAF6'
+                }]
+            },
+            tooltip: {
+                formatter: function() {
+                        return '<b>'+ this.series.name +'</b><br/>'+
+                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) +'<br/>'+
+                        Highcharts.numberFormat(this.y, 2);
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            exporting: {
+                enabled: true
+            },
+            plotOptions: {series: {animation: false}},
+            series: [{
+                name: 'Random data',
+                data: []	//[{x: new Date().getTime(), y: 0.5}]
+            }]
+        });
+	}
+</script>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Real-time geophone signal</title>
+    <meta name="author" content="PEI Lab">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
+	<div id="geophone-graph" style="width: 600px; height: 400px; margin: 0 auto"></div>
+	<p><input type="button" value="Clear data" style="width: 100px;" onClick="javascript: dataClear();"></p>
+	<script>onDocumentReady();	// Last tag of the <body> means 'document.' is ready to be accessed</script>
+</body>
+</html>
