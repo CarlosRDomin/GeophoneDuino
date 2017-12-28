@@ -21,7 +21,7 @@ The code assumes the following hardware components are stacked on top of each ot
  3. Upload the sketch (`Sketch > Upload`)
  4. Copy SPIFFS (filesystem) files by clicking on `Tools > ESP8266 Sketch Data Upload`. This step will allow you to:
    - Connect to the Arduino's own hotspot (which is automatically created whenever it is unable to connect to the default WiFi network), perform a network scan and [configure which network it should connect to](#how-to-configure-which-network-to-join).
-   - [Visualize sensor data in real-time wirelessly](#hot-to-see-real-time-sensor-data) (doesn't even need an Internet connection)
+   - [Visualize sensor data in real-time wirelessly](#how-to-see-real-time-sensor-data) (doesn't even need an Internet connection)
 
 ### How to configure which network to join?
 In order to wirelessly interact with the Arduino, both devices need to be in the same network. One could change these settings in the code and reflash the firmware every time the testing/deployment environment changes, but sometimes this isn't ideal.

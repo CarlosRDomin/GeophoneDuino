@@ -27,7 +27,7 @@
 				<tr><th>SSID:</th><td id="tdFormSSID">
 					<div id="divFormSSID"><div id="formSSIDnetsAvail"><select name="ssidDropdown" id="ssidDropdown" style="height: 18pt; width: 100%;"></select><br> or <br><input type="checkbox" name="ssidManualChk" id="ssidManualChk"> <label for="ssidManualChk">Manual SSID:</label> </div>
 					<div id="formSSIDnoNetsAvail">No WLAN networks found, gonna have to enter SSID manually:<br><input type="hidden" name="ssidManualChk" value="on"/></div></div>
-					<input type="text" placeholder="Network SSID" name="ssidManualTxt" id="ssidManualTxt" value="" onKeyDown="javascript: $('#ssidManualChk').val(true)" onchange="onManualSSIDchange"/></td></tr>
+					<input type="text" placeholder="Network SSID" name="ssidManualTxt" id="ssidManualTxt" value=""/></td></tr>
 				<tr><th>Password:</th><td><input type="password" placeholder="password" name="pass" id="pass" value=""/></td></tr>
 				<tr><th>Static IP:</th><td><input type="text" placeholder="Static IP" name="ip" id="ip" value=""/></td></tr>
 				<tr><th>Gateway:</th><td><input type="text" placeholder="Gateway" name="gateway" id="gateway" value=""/></td></tr>
