@@ -10,7 +10,8 @@
 
 <script>
 	var GRAPH_ID = "geophone-graph";
-	var F_SAMP = 10000, X_RANGE_IN_SEC = 1;
+	var F_SAMP = 10000, X_RANGE_IN_SEC = 5;
+	var Y_MIN = 0, Y_MAX = 4095;
 	var arrData = {x_millis: [], x: [], y: []};
 	var ws;
 	
@@ -27,7 +28,7 @@
 			if (!ws.hasReceivedAnyMessagesYet) {
 				Plotly.relayout(GRAPH_ID, {
 					title: evt.data,
-					'yaxis.range': [0, 4095]
+					'yaxis.range': [Y_MIN, Y_MAX]
 				});
 				ws.hasReceivedAnyMessagesYet = true;
 				return;
@@ -66,8 +67,8 @@
 		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
 	}
 	
-	function dataUpdateGraph() {
-		if (!ws || ws.readyState !== ws.OPEN) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
+	function dataUpdateGraph(forceUpdate=false) {
+		if (!forceUpdate && (!ws || ws.readyState !== ws.OPEN)) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
 		var len = arrData.y.length;
 		var nowInSecs = arrData.x[len-1];
 
@@ -109,6 +110,12 @@
 		});
 	}
 	
+	function updateYlims() {
+		Plotly.relayout(GRAPH_ID, {
+			'yaxis.range': [Y_MIN, Y_MAX]
+		});
+	}
+	
 	// Helper function that allows pushing an array to an existing array
 	Array.prototype.pushArray = function(arr) {
 		this.push.apply(this, arr);
@@ -121,10 +128,18 @@
 			'line.color': '#80CAF6'
 		}]);
 		setInterval(dataUpdateGraph, 50);  // 20Hz refresh rate
+		
+		// Handle zoom controls (and update vars with current value)
+		Y_MAX = $("#zoomYmax").val();
+		Y_MIN = $("#zoomYmin").val();
+		X_RANGE_IN_SEC = $("#zoomX").val();
+		$("#zoomYmax").on('change keydown paste input', function() { Y_MAX = Math.max(parseInt($("#zoomYmax").val()), Y_MIN+1); updateYlims(); });
+		$("#zoomYmin").on('change keydown paste input', function() { Y_MIN = Math.min(parseInt($("#zoomYmin").val()), Y_MAX-1); updateYlims(); });
+		$("#zoomX").on('change keydown paste input', function() { X_RANGE_IN_SEC = parseFloat($("#zoomX").val()); dataUpdateGraph(true); });
 
 		var DEFAULT_HOST = "192.168.43.100"; // window.location.hostname;
 		var DEFAULT_PORT = 81;
-		$('#wsHost')[0].value = DEFAULT_HOST;
+		$('#wsHost')[0].value = (window.location.hostname !== '')? window.location.hostname : DEFAULT_HOST;
 		$('#wsPort')[0].value = DEFAULT_PORT;
 		wsReconnect();
 	});
@@ -142,7 +157,27 @@
 
 <body>
 	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
-	<div id="geophone-graph" style="width: 600px; height: 400px;"></div>
+	<table style="border: none;">
+		<tr>
+			<td><div id="geophone-graph" style="width: 600px; height: 400px;"></div></td>
+			<td><fieldset><legend>Vertical zoom</legend>
+				<table style="border: none;">
+					<tr>
+					<td align="right" style="white-space: nowrap;">Max y:</td>
+					<td align="left"><input type="number" id="zoomYmax" min="1" max="4095" value="4095" style="width: 50px;"></td>
+					</tr><tr>
+					<td align="right" style="white-space: nowrap;">Min y:</td>
+					<td align="left"><input type="number" id="zoomYmin" min="0" max="4094" value="0" style="width: 50px;"></td>
+					</tr>
+				</table>
+				</fieldset>
+				<br>
+				<fieldset><legend>Horizontal zoom</legend>
+				Show last <input type="number" id="zoomX" min="1" max="15" step="0.5" value="5" style="width: 35px; margin-left: 4px;"> s
+				</fieldset>
+			</td>
+		</tr>
+	</table>
 	<p><input type="button" value="Clear data" style="width: 100px;" onClick="javascript: dataClear();"><input type="button" value="Save data" style="margin-left: 10px; width: 100px;" onClick="javascript: dataDownload();"></p>
 </body>
 </html>
