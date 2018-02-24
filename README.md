@@ -11,17 +11,49 @@ The code assumes the following hardware components are stacked on top of each ot
 
 ## Instructions
 
+### Installing the drivers
+The Arduino ESP8266 uses a CH34x chip instead of the more common FTDI. Therefore, the right drivers need to be installed in order for the board to show up when you plug it in through USB. Driver file (for Mac) is available under `Datasheets and useful info/CH34x_Install_V1.4.pkg`. Simply double click and follow the on-screen instructions (might need to reboot).
+
+<!-- ### Adding the Esp8266 board to the Arduino IDE
+[Copied from [here](http://esp8266.github.io/Arduino/versions/2.0.0/doc/installing.html)]
+ 1. Open the Arduino IDE and select the menu `Arduino > Preferences`
+ 2. Next to `Additional Boards Manager URLs` enter `http://arduino.esp8266.com/stable/package_esp8266com_index.json`
+ 3. Open the Boards Manager by navigating to `Tools > Board > Boards Manager...`
+ 4. Search for `esp8266`, select the version `2.3.0` from the dropdown (THIS STEP IS IMPORTANT, the latest version breaks the code!) and click `Install` -->
+
+### Installing necessary libraries
+#### Filesystem plugin
+ The filesystem plugin allows you to save files in the Esp8266's Flash memory (so we can host webpages, etc.). The plugin is [here](https://github.com/esp8266/arduino-esp8266fs-plugin). Steps to install:
+  1. Download the latest `zip` file (no need to download the source) from the [Releases tab](https://github.com/esp8266/arduino-esp8266fs-plugin/releases) (eg: latest version as of Feb 19th 2018 is 0.3.0)
+  2. Locate your Arduino home folder (usually under `<home_dir>/Documents/Arduino` or `<home_dir>/Arduino`), which is where you should have cloned this repository
+  3. If it doesn't exist, create a folder called `tools` inside the `Arduino` folder
+  4. Extract the `zip` file you downloaded, so now there should be a file named `...Arduino/tools/ESP8266FS/tool/esp8266fs.jar`
+  5. Restart the Arduino IDE
+
+#### Remaining libraries
+ In order to make it easier to install all libraries and the Esp8266 core, I added a Python script under the `submodules` folder (which uses `git submodule` to fetch the right version of each library). So the steps simply are:
+  1. Open a Terminal console and navigate to the `submodules` folder in this repo
+  2. Execute this command:
+  ```sh
+  python symlinks.py -i
+  ```
+  NOTE: this would install the libraries and the board into the **default** Arduino folder (_eg_ for Mac: `<home_dir>/Documents/Arduino`). If your `Arduino` folder is somewhere else, specify such path as an argument to the Python script like this: `python symlinks.py -i -p <PATH>`
+
 ### How to flash the firmware?
  1. Open the file `GeophoneDuino.ino` in the Arduino IDE.
  2. Plug in the ESP8266 through USB, select the right port on `Tools > Port` (_eg_: `\dev\cu.wchusbserial14440`) and configure the board as:
    - Board: WeMos D1 R2 & mini
+   - Flash size: 4M (1M SPIFFS)
+   - Debug port: Disabled
+   - Debug level: None
+   - lwIP variant: v2 higher bandwidth
    - CPU frequency: 160 MHz
-   - Flash size: 4M (3M SPIFFS)
    - Upload speed: 921600
- 3. Upload the sketch (`Sketch > Upload`)
- 4. Copy SPIFFS (filesystem) files by clicking on `Tools > ESP8266 Sketch Data Upload`. This step will allow you to:
-   - Connect to the Arduino's own hotspot (which is automatically created whenever it is unable to connect to the default WiFi network), perform a network scan and [configure which network it should connect to](#how-to-configure-which-network-to-join).
-   - [Visualize sensor data in real-time wirelessly](#how-to-see-real-time-sensor-data) (doesn't even need an Internet connection)
+   - Erase Flash: only Sketch
+ 3. Copy SPIFFS (filesystem) files by clicking on `Tools > ESP8266 Sketch Data Upload`. This step will allow you to:
+       - Connect to the Arduino's own hotspot (which is automatically created whenever it is unable to connect to the default WiFi network), perform a network scan and [configure which network it should connect to](#how-to-configure-which-network-to-join).
+       - [Visualize sensor data in real-time wirelessly](#how-to-see-real-time-sensor-data) (doesn't even need an Internet connection)
+ 4. Upload the sketch (`Sketch > Upload`)
 
 ### How to configure which network to join?
 In order to wirelessly interact with the Arduino, both devices need to be in the same network. One could change these settings in the code and reflash the firmware every time the testing/deployment environment changes, but sometimes this isn't ideal.
