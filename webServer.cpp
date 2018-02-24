@@ -236,12 +236,12 @@ void webServerWLANsave(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 
 	consolePrintF("Received request to save new WLAN settings!\n");
 	bool bSSIDmanual = false;
-	if (request->hasArg(CF("ssidManualChk"))) bSSIDmanual = (request->arg(F("ssidManualChk"))=="on");
-	if (request->hasArg(bSSIDmanual? CF("ssidManualTxt"):CF("ssidDropdown"))) request->arg(bSSIDmanual? F("ssidManualTxt"):F("ssidDropdown")).toCharArray(wlanSSID, sizeof(wlanSSID)-1);
-	if (request->hasArg(CF("pass"))) request->arg("pass").toCharArray(wlanPass, sizeof(wlanPass)-1);
-	if (request->hasArg(CF("ip"))) wlanMyIP.fromString(request->arg(F("ip")));
-	if (request->hasArg(CF("gateway"))) wlanGateway.fromString(request->arg(F("gateway")));
-	if (request->hasArg(CF("mask"))) wlanMask.fromString(request->arg(F("mask")));
+	if (request->hasArg(F("ssidManualChk"))) bSSIDmanual = (request->arg(SF("ssidManualChk"))=="on");
+	if (request->hasArg(bSSIDmanual? CF("ssidManualTxt"):CF("ssidDropdown"))) request->arg(bSSIDmanual? SF("ssidManualTxt"):SF("ssidDropdown")).toCharArray(wlanSSID, sizeof(wlanSSID)-1);
+	if (request->hasArg(F("pass"))) request->arg(SF("pass")).toCharArray(wlanPass, sizeof(wlanPass)-1);
+	if (request->hasArg(F("ip"))) wlanMyIP.fromString(request->arg(SF("ip")));
+	if (request->hasArg(F("gateway"))) wlanGateway.fromString(request->arg(SF("gateway")));
+	if (request->hasArg(F("mask"))) wlanMask.fromString(request->arg(SF("mask")));
 	saveWLANconfig();	// Write new settings to EEPROM
 
 	AsyncWebServerResponse* response = request->beginResponse(200, contentType_P[TYPE_HTML], SF("<html><head><link rel=\"stylesheet\" href=\"css/styles.css\"></head><body><h1>WiFi config successfully saved!</h1><p>SSID: ") + wlanSSID + F("<br>IP: ") + wlanMyIP.toString() + F("<br>Gateway: ") + wlanGateway.toString() + F("<br>Mask: ") + wlanMask.toString() + F("</p></body></html>"));
