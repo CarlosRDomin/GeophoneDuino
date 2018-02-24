@@ -30,6 +30,6 @@ void loop() {
 	processGPIO();
 	processWiFi();
 	processWebServer();
-	delay(10);
+	delay(20);
 }
 

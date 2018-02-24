@@ -22,7 +22,7 @@ void setupAP() {	// Configures softAP
 	WiFi.softAP(SOFT_AP_SSID, SOFT_AP_PASS);
 	WiFi.softAPConfig(SOFT_AP_IP, SOFT_AP_IP, SOFT_AP_MASK);
 	WiFi.enableAP(false);
-	WiFi.setPhyMode(WIFI_PHY_MODE_11N);
+	//WiFi.setPhyMode(WIFI_PHY_MODE_11B);
 }
 
 void connectAP() {	// Enables softAP

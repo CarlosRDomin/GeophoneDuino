@@ -26,7 +26,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	// Setup mDNS so we don't need to know its IP
 	#if USE_MDNS
 		if (MDNS.begin(hostName)) {
-			consolePrintF("Starting mDNS, you can now also contact me through '%s.local'\n", hostName);
+			consolePrintF("Starting mDNS, you can now also contact me through 'http://%s.local'\n", hostName);
 			MDNS.addService(F("http"), F("tcp"), PORT_WEBSERVER);
 			MDNS.addService(F("ws"), F("tcp"), PORT_WEBSOCKET_GEOPHONE);
 			MDNS.addService(F("ws"), F("tcp"), PORT_WEBSOCKET_CONSOLE);
@@ -244,12 +244,9 @@ void webServerWLANsave(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 	if (request->hasArg(CF("mask"))) wlanMask.fromString(request->arg(F("mask")));
 	saveWLANconfig();	// Write new settings to EEPROM
 
-	AsyncWebServerResponse* response = request->beginResponse(302);
-	response->addHeader(F("Location"), F("WiFi"));	// Redirect them back to "/WiFi" so settings refresh
+	AsyncWebServerResponse* response = request->beginResponse(200, contentType_P[TYPE_HTML], SF("<html><head><link rel=\"stylesheet\" href=\"css/styles.css\"></head><body><h1>WiFi config successfully saved!</h1><p>SSID: ") + wlanSSID + F("<br>IP: ") + wlanMyIP.toString() + F("<br>Gateway: ") + wlanGateway.toString() + F("<br>Mask: ") + wlanMask.toString() + F("</p></body></html>"));
 	addNoCacheHeaders(response);
 	request->send(response);
-
-	if (strlen(wlanSSID) > 0) connectToWLAN();	// Connect/Reconnect WLAN with new credentials if there is an SSID
 }
 
 void webSocketGeophoneEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {	// webSocketGeophone event callback function
@@ -332,5 +329,4 @@ void processWebServer() {	// "webServer.loop()" function: handle incoming OTA co
 		ArduinoOTA.handle();
 	#endif
 }
-
 

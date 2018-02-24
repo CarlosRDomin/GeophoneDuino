@@ -21,7 +21,7 @@
 #define WEB_FILE_EDITOR_USERNAME	SF("PEILab")
 #define WEB_FILE_EDITOR_PASS		SF("geophone")
 #define USE_ARDUINO_OTA				false	// Whether or not to use Arduino's native IDE remote firmware flasher
-#define USE_MDNS					false	// Whether or not to use mDNS (allows access to the arduino through a name without knowing its IP)
+#define USE_MDNS					true	// Whether or not to use mDNS (allows access to the arduino through a name without knowing its IP)
 #define UNIQUE_HOSTNAME				true	// If true, use ESP.getChipId() to create a unique hostname; Otherwise, use "GeophoneDuino"
 #define JSON_BUFFER_SIZE			512
 #define UPLOAD_TEMP_FILENAME		"/tmp.file"	// Temporary file name given to a file uploaded through the web server. Once we receive its desired path, we'll rename it (move it)
