@@ -3,10 +3,11 @@
 
 <!-- Plotly.js and jQuery -->
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+
 <!-- Local backup for Plotly.js and jQuery -->
-<script>window.Plotly || document.write('<script src="lib/plotly/plotly.min.js"><\/script>')</script>
-<script>window.jQuery || document.write('<script src="lib/jquery/jquery.min.js"><\/script>')</script>
+<script>window.Plotly || document.write('<script src="lib/plotly.min.js"><\/script>')</script>
+<script>window.jQuery || document.write('<script src="lib/jquery.min.js"><\/script>')</script>
 
 <script>
 	var GRAPH_ID = "geophone-graph";
@@ -14,11 +15,11 @@
 	var Y_MIN = 0, Y_MAX = 4095;
 	var arrData = {x_millis: [], x: [], y: []};
 	var ws;
-	
+
 	function createWebSocket(connectTo) {
 		ws = new WebSocket(connectTo);
 		ws.hasReceivedAnyMessagesYet = false;
-		
+
 		ws.onopen = function() {
 			// Web Socket is connected
 			console.log("Successfully connected to " + ws.url);
@@ -33,40 +34,40 @@
 				ws.hasReceivedAnyMessagesYet = true;
 				return;
 			}
-			
+
 			var geophoneVal = JSON.parse(evt.data);
 			var now = Date.now();
-			
+
 			arrData.x_millis.push(now);
 			arrData.x.push((now - arrData.x_millis[0])/1000.0);
 			arrData.y.pushArray(geophoneVal);
-			
+
 			//dataUpdateGraph();
 		};
 
-		ws.onclose = function() { 
+		ws.onclose = function() {
 		  // websocket is closed.
 		};
 
 		ws.onerror = function(err) {
 			console.log("Error in webSocket!");
 		};
-		
+
 		return ws;
 	}
-	
+
 	function wsClose() {
 		if (ws) {
 			ws.close();
 		}
 		ws = null;
 	}
-	
+
 	function wsReconnect() {
 		wsClose();
 		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
 	}
-	
+
 	function dataUpdateGraph(forceUpdate=false) {
 		if (!forceUpdate && (!ws || ws.readyState !== ws.OPEN)) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
 		var len = arrData.y.length;
@@ -80,11 +81,11 @@
 			'xaxis.range': [len-X_RANGE_IN_SEC*F_SAMP, len]
 		});
 	}
-	
+
 	function dataDownload() {
 		var title = $("#" + GRAPH_ID)[0].layout.title;
         var filename = title + '.csv';
-		
+
 		var delimiter = '\n';
         var csv = arrData.y.join(delimiter);
         if (csv == null) return;
@@ -99,7 +100,7 @@
         link.setAttribute('download', filename);
         link.click();
 	}
-	
+
 	function dataClear() {
 		arrData.x_millis = [];
 		arrData.x = [];
@@ -109,13 +110,13 @@
 			y: [arrData.y]
 		});
 	}
-	
+
 	function updateYlims() {
 		Plotly.relayout(GRAPH_ID, {
 			'yaxis.range': [Y_MIN, Y_MAX]
 		});
 	}
-	
+
 	// Helper function that allows pushing an array to an existing array
 	Array.prototype.pushArray = function(arr) {
 		this.push.apply(this, arr);
@@ -128,7 +129,7 @@
 			'line.color': '#80CAF6'
 		}]);
 		setInterval(dataUpdateGraph, 50);  // 20Hz refresh rate
-		
+
 		// Handle zoom controls (and update vars with current value)
 		Y_MAX = $("#zoomYmax").val();
 		Y_MIN = $("#zoomYmin").val();
