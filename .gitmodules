@@ -1,0 +1,15 @@
+[submodule "ESPAsyncWebServer"]
+	path = submodules/libraries/ESPAsyncWebServer
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
+[submodule "ESPAsyncTCP"]
+	path = submodules/libraries/ESPAsyncTCP
+	url = https://github.com/me-no-dev/ESPAsyncTCP.git
+[submodule "ArduinoJson"]
+	path = submodules/libraries/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson
+[submodule "arduinoWebSockets"]
+	path = submodules/libraries/arduinoWebSockets
+	url = https://github.com/Links2004/arduinoWebSockets
+[submodule "esp8266"]
+	path = submodules/hardware/esp8266com/esp8266
+	url = https://github.com/esp8266/Arduino.git
