@@ -2,7 +2,6 @@
 
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
-from ws4py import format_addresses
 import time
 
 
@@ -14,9 +13,18 @@ class DataReceiver(WebSocketBaseClient):
 	def handshake_ok(self):
 		print("Connected to '{}'!".format(self.url))
 		ws_manager.add(self)
+		self.FILE_NAME = "data_{}.txt".format(self.bind_addr[0])
+		self.file_handle = open(self.FILE_NAME, 'w')
 
 	def received_message(self, msg):
-		print("Received data! {}".format(msg))
+		s = str(msg.data)
+		if s.startswith('['): s = s[1:-1]  # Remove brackets if necessary
+		self.file_handle.write(s + ',')
+		print("Received data! {}".format(msg if False else ''))
+
+	def close(self, code=1000, reason=''):
+		self.file_handle.close()
+		print("Closed socket! Data was saved at '{}'".format(self.FILE_NAME))
 
 
 def start_data_collection(conn_info):
@@ -34,7 +42,8 @@ def start_data_collection(conn_info):
 if __name__ == '__main__':
 	try:
 		ws_manager.start()
-		start_data_collection([('10.0.0.110', 81)])
+		# start_data_collection([('10.0.0.110', 81)])
+		start_data_collection([('192.168.0.99', 81)])
 
 		while True:
 			for ws in ws_manager.websockets.itervalues():
