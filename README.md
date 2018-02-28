@@ -11,17 +11,18 @@ The code assumes the following hardware components are stacked on top of each ot
 
 ## Instructions
 
+### Cloning the repo
+For the scripts to work, it is important to **clone** the repo instead of simply downloading it.
+ 1. Locate your Arduino home folder (usually under `<home_dir>/Documents/Arduino` or `<home_dir>/Arduino`)
+ 2. Open a terminal and navigate to that folder. _E.g._ `cd ~/Documents/Arduino`
+ 3. Clone the repo:
+ ```sh
+ git clone https://github.com/CarlosRDomin/GeophoneDuino.git
+ ```
+
 ### Installing the drivers
 The Arduino ESP8266 uses a CH34x chip instead of the more common FTDI. Therefore, the right drivers need to be installed in order for the board to show up when you plug it in through USB. Driver file (for Mac) is available under `Datasheets and useful info/CH34x_Install_V1.4.pkg`. Simply double click and follow the on-screen instructions (might need to reboot).
 
-<!-- ### Adding the Esp8266 board to the Arduino IDE
-[Copied from [here](http://esp8266.github.io/Arduino/versions/2.0.0/doc/installing.html)]
- 1. Open the Arduino IDE and select the menu `Arduino > Preferences`
- 2. Next to `Additional Boards Manager URLs` enter `http://arduino.esp8266.com/stable/package_esp8266com_index.json`
- 3. Open the Boards Manager by navigating to `Tools > Board > Boards Manager...`
- 4. Search for `esp8266`, select the version `2.3.0` from the dropdown (THIS STEP IS IMPORTANT, the latest version breaks the code!) and click `Install` -->
-
-### Installing necessary libraries
 #### Filesystem plugin
  The filesystem plugin allows you to save files in the Esp8266's Flash memory (so we can host webpages, etc.). The plugin is [here](https://github.com/esp8266/arduino-esp8266fs-plugin). Steps to install:
   1. Download the latest `zip` file (no need to download the source) from the [Releases tab](https://github.com/esp8266/arduino-esp8266fs-plugin/releases) (eg: latest version as of Feb 19th 2018 is 0.3.0)
@@ -30,7 +31,7 @@ The Arduino ESP8266 uses a CH34x chip instead of the more common FTDI. Therefore
   4. Extract the `zip` file you downloaded, so now there should be a file named `...Arduino/tools/ESP8266FS/tool/esp8266fs.jar`
   5. Restart the Arduino IDE
 
-#### Remaining libraries
+#### Installing 3rd-party libraries
  In order to make it easier to install all libraries and the Esp8266 core, I added a Python script under the `submodules` folder (which uses `git submodule` to fetch the right version of each library). So the steps simply are:
   1. Open a Terminal console and navigate to the `submodules` folder in this repo
   2. Execute this command:
@@ -66,3 +67,16 @@ Note that, upon successful network connection, the hotspot will be turned off an
 
 ### How to see real-time sensor data?
 Once both the Arduino and our laptop/phone/device are connected to the same network, we can simply open a web browser and navigate to `<Arduino IP>/` or, equivalently, `<Arduino IP>/index.html` and a live stream of data will show up. Click `Close socket` to stop streaming or `Save data` to download a `csv` file with all data recorded.
+
+### How to collect (store to file) data?
+The Python script to collect data relies on a WebSocket implementation that needs to be installed before the first use. Simply open a terminal and execute
+```sh
+pip install ws4py
+```
+
+Then, collect data by running the script:
+```sh
+python data_collection.py
+```
+
+(To stop collecting data, just press `Ctrl + C`)

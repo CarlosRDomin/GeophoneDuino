@@ -1,10 +1,13 @@
 #!/usr/bin/python
 
+import os
+import time
+from datetime import datetime
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
-import time
 
 
+OUTPUT_FOLDER = os.path.abspath("Experiment data")
 WS_TIMEOUT = 3  # Seconds before we give up connecting
 ws_manager = WebSocketManager()
 
@@ -13,7 +16,7 @@ class DataReceiver(WebSocketBaseClient):
 	def handshake_ok(self):
 		print("Connected to '{}'!".format(self.url))
 		ws_manager.add(self)
-		self.FILE_NAME = "data_{}.txt".format(self.bind_addr[0])
+		self.FILE_NAME = os.path.join(OUTPUT_FOLDER, "data_{}_{}.csv".format(self.bind_addr[0], datetime.now().strftime('%Y-%h-%d_%H-%M-%S')))
 		self.file_handle = open(self.FILE_NAME, 'w')
 
 	def received_message(self, msg):
@@ -28,6 +31,9 @@ class DataReceiver(WebSocketBaseClient):
 
 
 def start_data_collection(conn_info):
+	if not os.path.exists(OUTPUT_FOLDER):
+		os.makedirs(OUTPUT_FOLDER)
+
 	for (ip, port) in conn_info:
 		ws_url = "ws://{}:{}/geophone".format(ip, port)
 		print("Connecting to '{}'...".format(ws_url))
@@ -42,8 +48,7 @@ def start_data_collection(conn_info):
 if __name__ == '__main__':
 	try:
 		ws_manager.start()
-		# start_data_collection([('10.0.0.110', 81)])
-		start_data_collection([('192.168.0.99', 81)])
+		start_data_collection([('192.168.0.114', 81)])
 
 		while True:
 			for ws in ws_manager.websockets.itervalues():
