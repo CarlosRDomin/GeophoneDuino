@@ -1,22 +1,22 @@
 #!/usr/bin/python
 
 import os
+import socket
 import time
 from datetime import datetime, timedelta
 from ws4py.client import WebSocketBaseClient
-# from ws4py.manager import WebSocketManager
 from threading import Thread, Event
 
 
 OUTPUT_FOLDER = os.path.abspath("Experiment data")
 event_stop = Event()
 ws_threads = []
-# ws_manager = WebSocketManager()
 
 
 class DataReceiver(WebSocketBaseClient):
 	def __init__(self, url, delta_new_file=60, *args, **kwargs):
 		super(DataReceiver, self).__init__(url, *args, **kwargs)
+		self.sock.settimeout(5)  # Set the socket timeout so if a host is unreachable it doesn't take 60s (default) to figure out
 		self.output_filename = ''
 		self.output_file_handle = None
 		self.deadline_new_file = datetime.now()
@@ -34,14 +34,16 @@ class DataReceiver(WebSocketBaseClient):
 				self.connect()  # Attempt to connect to the Arduino
 			except Exception as e:
 				print("Unable to connect to '{}' (probably timed out). Reason: {}".format(self.url, e))
+				if isinstance(e, socket.error):  # If host is unreachable, slow down the re-connect rate so it doesn't use up all the network
+					time.sleep(5)
+
 			else:
 				self.run()  # If we were able to connect, then run the websocket (received_message will get called appropriately)
 
 		print("Thread in charge of '{}' exited :)".format(self.url))
 
-	def handshake_ok(self):
+	def opened(self):
 		print("Successfully connected to '{}'!".format(self.url))
-		# ws_manager.add(self)
 
 	def received_message(self, msg):
 		# Parse the message
@@ -60,12 +62,26 @@ class DataReceiver(WebSocketBaseClient):
 			self.output_file_handle = open(self.output_filename, 'w')
 
 		# Write the parsed message to the file
-		self.output_file_handle.write(s + ',')
+		try:  # In case the file has been closed (user stopped data collection), surround by try-except
+			self.output_file_handle.write(s + ',')
+		except Exception as e:
+			print("Couldn't write to '{}'. Error: {}".format(self.output_filename, e))
 		print("Received data from '{}'!".format(self.url))
 
 	def close(self, code=1000, reason=''):
-		self.output_file_handle.close()
-		print("Closed socket! Data was saved at '{}'".format(self.output_filename))
+		try:
+			super(DataReceiver, self).close(code, reason)
+		except socket.error as e:
+			print("Error closing the socket '{}' (probably the host was unreachable). Reason: {}".format(self.url, e))
+
+	def closed(self, code, reason=None):
+		if self.output_file_handle:
+			self.output_file_handle.close()
+			self.output_file_handle = None
+			print("Data was saved at '{}' after closing the socket".format(self.output_filename))
+
+	def unhandled_error(self, error):
+		print("unhandled_error")
 
 
 def start_data_collection(conn_info):
@@ -76,29 +92,26 @@ def start_data_collection(conn_info):
 		ws_url = "ws://{}:{}/geophone".format(ip, port)
 		ws = DataReceiver(ws_url, delta_new_file=10)
 		ws_thread = Thread(target=ws.run_thread)
-		ws_threads.append(ws_thread)
+		ws_threads.append((ws_thread, ws))
 		ws_thread.start()
 
 
 if __name__ == '__main__':
 	try:
-		# ws_manager.start()
-		start_data_collection([('192.168.0.1', 81), ('192.168.0.101', 81)])
+		# Start the data collection process
+		start_data_collection([('192.168.0.112', 81), ('192.168.0.116', 81), ('192.168.0.108', 81), ('192.168.0.200', 81)])
+
+		# And wait for a keyboard interruption while threads collect data
 		while True:
 			time.sleep(1)
-
-		# while True:
-		# 	for ws in ws_manager.websockets.itervalues():
-		# 		if not ws.terminated:
-		# 			break
-		# 	else:
-		# 		break
-		# 	time.sleep(3)
 	except KeyboardInterrupt:
-		# ws_manager.close_all()
-		# ws_manager.stop()
-		# ws_manager.join()
-		print("Stopping data collection! (If a thread is attempting a connection to an unreachable IP it may take up to 60s to exit)")
-		event_stop.set()
-		for ws_thread in ws_threads:
+		print("Stopping data collection!")
+
+		event_stop.set()  # Let the threads know they need to exit
+
+		# Close all the websockets
+		for (_, ws) in ws_threads:
+			Thread(target=ws.close).start()  # ws.close is blocking so just call it from a new thread (as long as we're not collecting data from too many nodes, we shouldn't hit the max thread limit)
+		# And wait for all threads to finish
+		for (ws_thread, _) in ws_threads:
 			ws_thread.join()
