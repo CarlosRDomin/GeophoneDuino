@@ -90,7 +90,7 @@ def start_data_collection(conn_info):
 
 	for (ip, port) in conn_info:
 		ws_url = "ws://{}:{}/geophone".format(ip, port)
-		ws = DataReceiver(ws_url, delta_new_file=10)
+		ws = DataReceiver(ws_url, delta_new_file=60)  # Change delta_new_file to how often (in seconds) a new file should be created!
 		ws_thread = Thread(target=ws.run_thread)
 		ws_threads.append((ws_thread, ws))
 		ws_thread.start()
