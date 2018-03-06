@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import argparse
 import os
 import socket
 import coloredlogs, verboselogs
@@ -47,6 +48,7 @@ class DataReceiver(WebSocketBaseClient, Thread):
 				while self.once():
 					pass  # self.once() will return False on error/close -> Only stop when the connection is lost or self.close() is called
 			self.terminate()
+			time.sleep(2)  # Wait for a couple of seconds for Arduino to reboot/connect or just to avoid network overload
 
 		logger.success("Thread in charge of '{}' exited :)".format(self.url))
 
@@ -103,11 +105,11 @@ class DataCollection:
 		self.event_stop = Event()
 		self.ws_threads = []
 
-	def start(self, conn_info):
+	def start(self, conn_info, delta_new_file=60):
 		for (ip, port) in conn_info:
 			ws_url = "ws://{}:{}/geophone".format(ip, port)
 			# Create a websocket thread responsible for collecting data from ws_url
-			ws = DataReceiver(self, ws_url, delta_new_file=10, heartbeat_freq=1)  # Change delta_new_file to how often (in seconds) a new file should be created!
+			ws = DataReceiver(self, ws_url, delta_new_file)
 			ws.start()  # Execute our custom run() method in the new thread
 			self.ws_threads.append(ws)  # Store a list of all threads so we can close all sockets when the experiment needs to end
 
@@ -124,10 +126,41 @@ class DataCollection:
 
 
 if __name__ == '__main__':
+	parser = argparse.ArgumentParser(description='GeophoneDuino sensor network data collection')
+	parser.add_argument('-l', '--ip-list', nargs='+', metavar='IP',
+		help='Specify the (space-separated) list of IPs (eg: "... -l 192.168.0.101 192.168.0.105" to collect from only those two IPs).')
+	parser.add_argument('-r', '--range', nargs=3, metavar=('PREFIX', 'FROM', 'TO'),
+		help='Specify the range of IPs to collect data from. Eg: "--range 192.168.0 100 105" would connect to 192.168.0.100, 192.168.0.101, ..., 192.168.0.105 (NOTE THAT PREFIX DOESN''T END WITH A PERIOD) [default: %(default)s].',
+		default=['192.168.0', '100', '100'])
+	parser.add_argument('-p', '--port',
+		help='Specify the port number to which the websocket should connect [default: %(default)s].',
+		default=81, type=int)
+	parser.add_argument('-n', '--new-file-interval',
+		help='Specify how often (in seconds) a new file is created to store the data collected (prevents large and/or corrupted files) [default: %(default)s].',
+		default=60, type=int)
+
 	experiment = DataCollection()
+	args = parser.parse_args()
+	if args.ip_list is not None:
+		conn_info = [(x, args.port) for x in args.ip_list]
+	else:
+		# Parse prefix (make sure it ends in a period)
+		range_prefix = args.range[0]
+		if not range_prefix.endswith('.'): range_prefix += '.'
+
+		# And parse range start/end (ensure ints, etc.)
+		try:
+			range_start = int(args.range[1])
+			range_end = int(args.range[2])
+			if not (1 <= range_start <= range_end <= 254): raise ValueError("IP range value needs to be between 1 and 254")
+		except ValueError:
+			logger.critical("Couldn't parse IP range FROM/TO value (need to be ints between 1 and 254, with FROM <= TO)")
+			exit(-1)
+		conn_info = [(range_prefix + str(x), args.port) for x in range(range_start, range_end+1)]
+
 	try:
 		# Start the data collection process
-		experiment.start([('10.0.0.100', 81)])
+		experiment.start(conn_info, args.new_file_interval)
 
 		# And wait for a keyboard interruption while threads collect data
 		while True:
