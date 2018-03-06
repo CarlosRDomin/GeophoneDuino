@@ -8,37 +8,43 @@ from ws4py.client import WebSocketBaseClient
 from threading import Thread, Event
 
 
-OUTPUT_FOLDER = os.path.abspath("Experiment data")
-event_stop = Event()
-ws_threads = []
 
 
-class DataReceiver(WebSocketBaseClient):
-	def __init__(self, url, delta_new_file=60, *args, **kwargs):
-		super(DataReceiver, self).__init__(url, *args, **kwargs)
-		self.sock.settimeout(5)  # Set the socket timeout so if a host is unreachable it doesn't take 60s (default) to figure out
+class DataReceiver(WebSocketBaseClient, Thread):
+	TIMEOUT = 5  # Specify a small socket timeout (in sec) such that if any operation takes too long, the call doesn't block forever
+
+	def __init__(self, data_collection, url, delta_new_file=60, *args, **kwargs):
+		Thread.__init__(self)
+		self.data_collection = data_collection  # Keep track of the global data_collection object (to access OUTPUT_FOLDER and event_stop)
+		self.url = url
+		self.init_args = args  # Store the initialization args and kwargs so we can re-init the websocket later
+		self.init_kwargs = kwargs
 		self.output_filename = ''
 		self.output_file_handle = None
 		self.deadline_new_file = datetime.now()
 		self.DELTA_NEW_FILE = timedelta(seconds=delta_new_file)
 
 	def generate_new_filename(self):
-		self.output_filename = os.path.join(OUTPUT_FOLDER, "data_{}_{}.csv".format(self.bind_addr[0], datetime.now().strftime('%Y-%h-%d_%H-%M-%S')))
-		self.deadline_new_file += self.DELTA_NEW_FILE  # Update the timestamp at which to start a new file
+		self.output_filename = os.path.join(self.data_collection.OUTPUT_FOLDER, "data_{}_{}.csv".format(self.bind_addr[0], datetime.now().strftime('%Y-%h-%d_%H-%M-%S')))
+		self.deadline_new_file = datetime.now() + self.DELTA_NEW_FILE  # Update the timestamp at which to start a new file
 
-	def run_thread(self):
+	def run(self):
 		# Run forever until event_stop tells us to stop
-		while not event_stop.is_set():
-			print("Connecting to '{}'...".format(self.url))
+		while not self.data_collection.event_stop.is_set():
+			# Initialize the websocket
+			WebSocketBaseClient.__init__(self, self.url, *self.init_args, **self.init_kwargs)
 			try:
+				self.sock.settimeout(self.TIMEOUT)  # Set the socket timeout so if a host is unreachable it doesn't take 60s (default) to figure out
 				self.connect()  # Attempt to connect to the Arduino
 			except Exception as e:
 				print("Unable to connect to '{}' (probably timed out). Reason: {}".format(self.url, e))
-				if isinstance(e, socket.error):  # If host is unreachable, slow down the re-connect rate so it doesn't use up all the network
-					time.sleep(5)
-
-			else:
-				self.run()  # If we were able to connect, then run the websocket (received_message will get called appropriately)
+			else:  # If we were able to connect, then run the websocket (received_message will get called appropriately)
+				with Heartbeat(self, frequency=self.heartbeat_freq):
+					# self.sock.setblocking(True)
+					self.sock.settimeout(self.TIMEOUT)  # Heartbeat resets the timeout to None -> Reset it to TIMEOUT again
+					while self.once():
+						pass  # This method will only stop when the connection is lost or we're asked to close the websocket
+			self.terminate()
 
 		print("Thread in charge of '{}' exited :)".format(self.url))
 
