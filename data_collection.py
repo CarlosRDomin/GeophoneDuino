@@ -49,6 +49,7 @@ class DataReceiver(WebSocketBaseClient):
 		# Parse the message
 		s = str(msg.data)
 		if s.startswith('['): s = s[1:-1]  # Remove brackets if necessary
+		else: return  # Ignore Geophone ID message (eg: Geophone_AABBBCC)
 
 		# Check if we need to start a new file
 		if datetime.now() > self.deadline_new_file:
