@@ -6,7 +6,6 @@ import coloredlogs, logging, verboselogs
 import time
 from datetime import datetime, timedelta
 from ws4py.client import WebSocketBaseClient
-from ws4py.websocket import Heartbeat
 from threading import Thread, Event
 
 
@@ -38,18 +37,15 @@ class DataReceiver(WebSocketBaseClient, Thread):
 		while not self.data_collection.event_stop.is_set():
 			# Initialize the websocket
 			WebSocketBaseClient.__init__(self, self.url, *self.init_args, **self.init_kwargs)
+			self.sock.settimeout(self.TIMEOUT)  # Set the socket timeout so if a host is unreachable it doesn't take 60s (default) to figure out
 			logger.notice("Connecting to '{}'...".format(self.url))
 			try:
-				self.sock.settimeout(self.TIMEOUT)  # Set the socket timeout so if a host is unreachable it doesn't take 60s (default) to figure out
 				self.connect()  # Attempt to connect to the Arduino
 			except Exception as e:
 				logger.error("Unable to connect to '{}' (probably timed out). Reason: {}".format(self.url, e))
 			else:  # If we were able to connect, then run the websocket (received_message will get called appropriately)
-				with Heartbeat(self, frequency=self.heartbeat_freq):
-					# self.sock.setblocking(True)
-					self.sock.settimeout(self.TIMEOUT)  # Heartbeat resets the timeout to None -> Reset it to TIMEOUT again
-					while self.once():
-						pass  # This method will only stop when the connection is lost or we're asked to close the websocket
+				while self.once():
+					pass  # self.once() will return False on error/close -> Only stop when the connection is lost or self.close() is called
 			self.terminate()
 
 		logger.success("Thread in charge of '{}' exited :)".format(self.url))
