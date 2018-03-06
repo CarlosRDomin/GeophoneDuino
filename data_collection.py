@@ -83,35 +83,44 @@ class DataReceiver(WebSocketBaseClient):
 	def unhandled_error(self, error):
 		print("unhandled_error")
 
+class DataCollection:
+	def __init__(self, output_folder=os.path.abspath("Experiment data")):
+		self.OUTPUT_FOLDER = output_folder
+		if not os.path.exists(self.OUTPUT_FOLDER):  # Create output folder if needed
+			os.makedirs(self.OUTPUT_FOLDER)
 
-def start_data_collection(conn_info):
-	if not os.path.exists(OUTPUT_FOLDER):
-		os.makedirs(OUTPUT_FOLDER)
+		# Thread-related global variables
+		self.event_stop = Event()
+		self.ws_threads = []
 
-	for (ip, port) in conn_info:
-		ws_url = "ws://{}:{}/geophone".format(ip, port)
-		ws = DataReceiver(ws_url, delta_new_file=60)  # Change delta_new_file to how often (in seconds) a new file should be created!
-		ws_thread = Thread(target=ws.run_thread)
-		ws_threads.append((ws_thread, ws))
-		ws_thread.start()
+	def start(self, conn_info):
+		for (ip, port) in conn_info:
+			ws_url = "ws://{}:{}/geophone".format(ip, port)
+			# Create a websocket thread responsible for collecting data from ws_url
+			ws = DataReceiver(self, ws_url, delta_new_file=10, heartbeat_freq=1)  # Change delta_new_file to how often (in seconds) a new file should be created!
+			ws.start()  # Execute our custom run() method in the new thread
+			self.ws_threads.append(ws)  # Store a list of all threads so we can close all sockets when the experiment needs to end
+
+	def stop(self):
+		logger.notice("Stopping data collection!")
+		self.event_stop.set()  # Let the threads know they need to exit
+
+		# First, close the websockets
+		for ws in self.ws_threads:
+			Thread(target=ws.close).start()  # ws.close is blocking so just call it from a new thread (as long as we're not collecting data from too many nodes, we shouldn't hit the max thread limit)
+		# And wait for all threads to finish
+		for ws in self.ws_threads:
+			ws.join()
 
 
 if __name__ == '__main__':
+	experiment = DataCollection()
 	try:
 		# Start the data collection process
-		start_data_collection([('192.168.0.112', 81), ('192.168.0.116', 81), ('192.168.0.108', 81), ('192.168.0.200', 81)])
+		experiment.start([('10.0.0.100', 81)])
 
 		# And wait for a keyboard interruption while threads collect data
 		while True:
 			time.sleep(1)
 	except KeyboardInterrupt:
-		print("Stopping data collection!")
-
-		event_stop.set()  # Let the threads know they need to exit
-
-		# Close all the websockets
-		for (_, ws) in ws_threads:
-			Thread(target=ws.close).start()  # ws.close is blocking so just call it from a new thread (as long as we're not collecting data from too many nodes, we shouldn't hit the max thread limit)
-		# And wait for all threads to finish
-		for (ws_thread, _) in ws_threads:
-			ws_thread.join()
+		experiment.stop()
