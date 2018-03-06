@@ -2,7 +2,7 @@
 
 import os
 import socket
-import coloredlogs, logging, verboselogs
+import coloredlogs, verboselogs
 import time
 from datetime import datetime, timedelta
 from ws4py.client import WebSocketBaseClient

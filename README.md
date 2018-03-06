@@ -69,9 +69,9 @@ Note that, upon successful network connection, the hotspot will be turned off an
 Once both the Arduino and our laptop/phone/device are connected to the same network, we can simply open a web browser and navigate to `<Arduino IP>/` or, equivalently, `<Arduino IP>/index.html` and a live stream of data will show up. Click `Close socket` to stop streaming or `Save data` to download a `csv` file with all data recorded.
 
 ### How to collect (store to file) data?
-The Python script to collect data relies on a WebSocket implementation that needs to be installed before the first use. Simply open a terminal and execute
+The Python script to collect data relies on a WebSocket implementation and a colored logging library which need to be installed before the first use. Simply open a terminal and execute:
 ```sh
-pip install ws4py
+pip install ws4py coloredlogs verboselogs
 ```
 
 Then, collect data by running the script:
