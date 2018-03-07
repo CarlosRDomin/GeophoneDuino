@@ -32,13 +32,27 @@ The Arduino ESP8266 uses a CH34x chip instead of the more common FTDI. Therefore
   5. Restart the Arduino IDE
 
 #### Installing 3rd-party libraries
- In order to make it easier to install all libraries and the Esp8266 core, I added a Python script under the `submodules` folder (which uses `git submodule` to fetch the right version of each library). So the steps simply are:
-  1. Open a Terminal console and navigate to the `submodules` folder in this repo
-  2. Execute this command:
-  ```sh
-  python symlinks.py -i
-  ```
-  NOTE: this would install the libraries and the board into the **default** Arduino folder (_eg_ for Mac: `<home_dir>/Documents/Arduino`). If your `Arduino` folder is somewhere else, specify such path as an argument to the Python script like this: `python symlinks.py -i -p <PATH>`
+ In order to make it easier to install all libraries and the Esp8266 core, I added a Python script called `setup.py` (which uses `git submodule` to fetch the right version of each library). To make it easier to read the output of the script, it uses the coloredlogs library so messages are color coded (there should be no red messages or something went wrong ;P). The steps are:
+  1. Open a Terminal console and install the helper Python libraries:
+     ```sh
+     pip install coloredlogs verboselogs
+     ```
+  2. Navigate to the root folder in this repo (_e.g._ `cd ~/Documents/Arduino/GeophoneDuino`)
+  3. Execute the installation script:
+     ```sh
+     python setup.py -i
+     ```
+  NOTE: this would install the libraries and the board into the **default** Arduino folder (_eg_ for Mac: `<home_dir>/Documents/Arduino`). If your `Arduino` folder is somewhere else, specify such path as an argument to the Python script like this: `python setup.py -i -p <PATH>`
+
+  NOTE 2: If you get an error like `IOError: [Errno socket error] [SSL: TLSV1_ALERT_PROTOCOL_VERSION] tlsv1 alert protocol version (_ssl.c:590)`, follow these steps:
+1. [Install Homebrew](https://docs.brew.sh/Installation) (unless you already have it)
+2. On a Terminal, execute:
+    ```sh
+    brew update
+    brew install openssl
+    brew install python
+    ```
+3. Try installing the 3rd-party libraries again (`python setup.py -i`)
 
 ### How to flash the firmware?
  1. Open the file `GeophoneDuino.ino` in the Arduino IDE.
