@@ -3,16 +3,11 @@
 import argparse
 import os
 import socket
-import coloredlogs, verboselogs
 import time
 from datetime import datetime, timedelta
 from ws4py.client import WebSocketBaseClient
 from threading import Thread, Event
-
-
-# Create a colored logger so it's easy to skim console messages
-logger = verboselogs.VerboseLogger(__name__)
-coloredlogs.install(level="DEBUG", fmt="%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s", field_styles={"asctime": {"color": "cyan", "bold": True}, "levelname": {"bold": True}})
+from log_helper import logger
 
 
 class DataReceiver(WebSocketBaseClient, Thread):
