@@ -6,10 +6,13 @@
 	url = https://github.com/me-no-dev/ESPAsyncTCP.git
 [submodule "ArduinoJson"]
 	path = submodules/libraries/ArduinoJson
-	url = https://github.com/bblanchon/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson.git
 [submodule "arduinoWebSockets"]
 	path = submodules/libraries/arduinoWebSockets
-	url = https://github.com/Links2004/arduinoWebSockets
+	url = https://github.com/Links2004/arduinoWebSockets.git
+[submodule "ESP8266FS"]
+	path = submodules/plugins/ESP8266FS
+	url = https://github.com/CarlosRDomin/arduino-esp8266fs-plugin.git
 [submodule "esp8266"]
 	path = submodules/hardware/esp8266com/esp8266
 	url = https://github.com/esp8266/Arduino.git
