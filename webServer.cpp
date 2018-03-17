@@ -43,7 +43,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	webServer.on(SF("/heap").c_str(), HTTP_GET, [](AsyncWebServerRequest* request) { AsyncWebServerResponse* response = request->beginResponse(200, CONT(TYPE_PLAIN), String(ESP.getFreeHeap()) + F(" B")); addNoCacheHeaders(response); response->addHeader(F("Refresh"), F("2")); request->send(response); });
 	webServer.on(SF("/restart").c_str(), HTTP_GET, [](AsyncWebServerRequest* request) { AsyncWebServerResponse* response = request->beginResponse(200, contentType_P[TYPE_PLAIN], F("Restarting!")); addNoCacheHeaders(response); response->addHeader(F("Refresh"), F("15; url=/heap")); request->send(response); shouldReboot = true; });
 	
-	webServer.serveStatic("/", SPIFFS, "/www/").setDefaultFile("index.html").setCacheControl("public, max-age=1209600");	// Cache for 2 weeks :)
+	webServer.serveStatic("/", SPIFFS, "/www/", "public, max-age=1209600").setDefaultFile("index.html");	// Cache for 2 weeks :)
 
 	webServer.on("/OTA", HTTP_GET, [](AsyncWebServerRequest* request) {
 		request->send(200, CONT(TYPE_HTML), F("<form method='POST' action='/OTA' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>"));

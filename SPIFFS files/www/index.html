@@ -2,8 +2,8 @@
 <html lang="en">
 
 <!-- Plotly.js and jQuery -->
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
+<!-- <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script> -->
 
 <!-- Local backup for Plotly.js and jQuery -->
 <script>window.Plotly || document.write('<script src="lib/plotly.min.js"><\/script>')</script>
@@ -98,6 +98,7 @@
         var link = document.createElement('a');
         link.setAttribute('href', data);
         link.setAttribute('download', filename);
+        link.setAttribute('target', '_blank');
         link.click();
 	}
 
