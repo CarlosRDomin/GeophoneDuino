@@ -7,6 +7,9 @@
 [submodule "ArduinoJson"]
 	path = submodules/libraries/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
+[submodule "arduinoFFT"]
+	path = submodules/libraries/arduinoFFT
+	url = https://github.com/kosme/arduinoFFT.git
 [submodule "arduinoWebSockets"]
 	path = submodules/libraries/arduinoWebSockets
 	url = https://github.com/Links2004/arduinoWebSockets.git
