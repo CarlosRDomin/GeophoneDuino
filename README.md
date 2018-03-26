@@ -48,7 +48,9 @@ In order to make it easier to install all libraries, plugins and the Esp8266 cor
 		```
 	  3. Prepend miniconda to your `PATH` on `~/.bash_profile` by adding the line: `export PATH="$HOME/miniconda2/bin:$PATH"`
 	  4. Reopen the terminal (or open a new tab) so changes take place (_e.g._, `which python` should point to `$HOME/miniconda2/bin/python`)
-2. Try installing the 3rd-party libraries again (`python setup.py -i`)
+    2. Try installing the 3rd-party libraries again (`python setup.py -i`)
+
+  **NOTE 3**: If you get a message like `No Java runtime present, requesting install`, you need to install the [Java JDK 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html). Just download the latest update (`8u162` as of March 2018) and open the installer (takes ~1min)
 
 ### Installing the USB drivers
 The Arduino ESP8266 uses a CH34x chip instead of the more common FTDI. Therefore, the right drivers need to be installed in order for the board to show up when you plug it in through USB. Driver file (for Mac) is available under `Datasheets and useful info/CH34x_Install_V1.4.pkg`. Simply double click and follow the on-screen instructions (might need to reboot).
