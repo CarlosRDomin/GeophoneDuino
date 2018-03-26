@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+
+<script src="workerBlobToArr.js"></script>
+<script src="helperFuncs.js"></script>
+<!-- Plotly.js and jQuery -->
+<script>addLibScripts([['https://cdn.plot.ly/plotly-latest.min.js', 'lib/plotly.min.js'], ['https://code.jquery.com/jquery-3.3.1.min.js', 'lib/jquery.min.js']]);</script>
+
+<script>
+	var GRAPH_RAW_ID = "graphRawFFT", GRAPH_PROC_ID = "graphProcFFT";
+	var F_SAMP = 10e3;
+	var Y_LIMS_RAW = [0, 25e3], Y_LIMS_PROC = [100, 25e3];
+	var arrData = {x: [], y: []};
+	var ws;
+
+	function createWebSocket(connectTo) {
+		ws = new WebSocket(connectTo);
+		ws.hasReceivedAnyMessagesYet = false;
+
+		ws.onopen = function() {
+			// WebSocket is connected
+			console.log("Successfully connected to " + ws.url);
+		};
+
+		ws.onmessage = function(evt) {
+			// Create a WebWorker to process the message (FFT data) in a new thread
+			var workerThread = createNewWorker();
+
+			workerThread.onmessage = function(e) {
+				arrData.y = e.data.binData;	// Save the new results
+				var updateDataRaw = {y: [arrData.y]};	// And make sure they'll get updated on the next Plotly.update call
+				var updateLayoutRaw = {}, updateLayoutProc = {};	// By default, no need to update the layout
+				
+				if (ws && !ws.hasReceivedAnyMessagesYet) {	// On the first message received, update x-axis and title (only need to do this once)
+					ws.hasReceivedAnyMessagesYet = true;
+					
+					var fftLen = e.data.binData.length-1;
+					arrData.x = Array.from(Array(fftLen+1), (e,i) => (i)* F_SAMP/2/fftLen);	// Compute the center of each freq. bin
+					
+					updateDataRaw.x = [arrData.x];
+					updateLayoutRaw.title = 'Geophone FFT (raw)';
+					updateLayoutProc.title = 'Geophone FFT (log scale)';
+				}
+				
+				Plotly.update(GRAPH_RAW_ID, updateDataRaw, updateLayoutRaw);	// Update (repaint) the graph
+				Plotly.update(GRAPH_PROC_ID, updateDataRaw, updateLayoutProc);
+				workerThread.terminate();	// Terminate the Thread
+			};
+			
+			// Pass a message to process the packet in the worker thread we just created
+			workerThread.postMessage({cmd: 'parse', blob: evt.data, toType: 'double', scriptPath: getWorkerScriptPath()});
+		};
+
+		ws.onclose = function() {
+		  // WebSocket is closed.
+			console.log("WebSocket closed!");
+		};
+
+		ws.onerror = function(err) {
+			console.log("Error in webSocket!");
+		};
+
+		return ws;
+	}
+
+	function wsClose() {
+		if (ws) ws.close();
+		ws = null;
+	}
+
+	function wsReconnect() {
+		wsClose();
+		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
+	}
+
+	function updateYlims() {
+		Plotly.relayout(GRAPH_RAW_ID, { 'yaxis.range': Y_LIMS_RAW });
+		Plotly.relayout(GRAPH_PROC_ID, { 'yaxis.range': Y_LIMS_PROC.map(x => Math.log10(x)) });
+	}
+
+	function jQueryAssignDocumentReady() {
+		$(document).ready(function() {
+			Plotly.plot(GRAPH_RAW_ID, [{
+				y: [],
+				type: 'bar'
+			}], {
+				yaxis: {
+					autorange: false,
+					range: Y_LIMS_RAW
+				}
+			}, {
+				modeBarButtonsToRemove: ['sendDataToCloud'],
+				displaylogo: false
+			});
+
+			Plotly.plot(GRAPH_PROC_ID, [{
+				type: 'bar'
+			}], {
+				xaxis: {
+					type: 'log',
+					autorange: false,
+					range: [0.5, Math.log10(2000)]
+				},
+				yaxis: {
+					type: 'log',
+					autorange: false,
+					range: Y_LIMS_PROC.map(x => Math.log10(x))
+				}
+			}, {
+				modeBarButtonsToRemove: ['sendDataToCloud'],
+				displaylogo: false
+			});
+
+			// Handle zoom controls (and update vars with current value)
+			$("#zoomYminRaw").val(Y_LIMS_RAW[0]);
+			$("#zoomYmaxRaw").val(Y_LIMS_RAW[1]);
+			$("#zoomYminRaw").on('change keydown paste input', function() { Y_LIMS_RAW[0] = Math.min(parseInt(this.value), Y_LIMS_RAW[1]-1); updateYlims(); });
+			$("#zoomYmaxRaw").on('change keydown paste input', function() { Y_LIMS_RAW[1] = Math.max(parseInt(this.value), Y_LIMS_RAW[0]+1); updateYlims(); });
+			$("#zoomYminProc").val(Y_LIMS_PROC[0]);
+			$("#zoomYmaxProc").val(Y_LIMS_PROC[1]);
+			$("#zoomYminProc").on('change keydown paste input', function() { Y_LIMS_PROC[0] = Math.min(parseInt(this.value), Y_LIMS_PROC[1]-1); updateYlims(); });
+			$("#zoomYmaxProc").on('change keydown paste input', function() { Y_LIMS_PROC[1] = Math.max(parseInt(this.value), Y_LIMS_PROC[0]+1); updateYlims(); });
+
+			var DEFAULT_HOST = "10.0.0.110"; // window.location.hostname;
+			var DEFAULT_PORT = 90;
+			$('#wsHost')[0].value = (window.location.hostname !== '')? window.location.hostname : DEFAULT_HOST;
+			$('#wsPort')[0].value = DEFAULT_PORT;
+			wsReconnect();
+		});
+	}
+</script>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Real-time FFT</title>
+    <meta name="author" content="PEI Lab">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
+	<table style="border: none;">
+		<tr>
+			<td><div id="graphRawFFT" style="width: 600px; height: 400px;"></div></td>
+			<td><fieldset><legend>Vertical zoom</legend>
+				<table style="border: none;">
+					<tr>
+					<td align="right" style="white-space: nowrap;">Max y:</td>
+					<td align="left"><input type="number" id="zoomYmaxRaw" min="1" max="100000" value="4095" style="width: 50px;"></td>
+					</tr><tr>
+					<td align="right" style="white-space: nowrap;">Min y:</td>
+					<td align="left"><input type="number" id="zoomYminRaw" min="0" max="99999" value="0" style="width: 50px;"></td>
+					</tr>
+				</table>
+				</fieldset>
+			</td>
+		</tr>
+		<tr>
+			<td><div id="graphProcFFT" style="width: 600px; height: 400px;"></div></td>
+			<td><fieldset><legend>Vertical zoom</legend>
+				<table style="border: none;">
+					<tr>
+					<td align="right" style="white-space: nowrap;">Max y:</td>
+					<td align="left"><input type="number" id="zoomYmaxProc" min="1" max="100000" value="4095" style="width: 50px;"></td>
+					</tr><tr>
+					<td align="right" style="white-space: nowrap;">Min y:</td>
+					<td align="left"><input type="number" id="zoomYminProc" min="0" max="99999" value="0" style="width: 50px;"></td>
+					</tr>
+				</table>
+				</fieldset>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>
