@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from ws4py.client import WebSocketBaseClient
 from threading import Thread, Event
 from log_helper import logger
+from struct import unpack
 
 
 class DataReceiver(WebSocketBaseClient, Thread):
@@ -51,10 +52,12 @@ class DataReceiver(WebSocketBaseClient, Thread):
 		logger.success("Successfully connected to '{}'!".format(self.url))
 
 	def received_message(self, msg):
-		# Parse the message
-		s = str(msg.data)
-		if s.startswith('['): s = s[1:-1]  # Remove brackets if necessary
-		else: return  # Ignore Geophone ID message (eg: Geophone_AABBBCC)
+		if msg.is_text: return  # Ignore Geophone ID message (eg: Geophone_AABBBCC)
+
+		# Parse the message: '<' for Little-Endian, 'H' for uint16_t
+		msg_format = '<' + 'H'*(len(msg.data)/2)
+		msg_vals = unpack(msg_format, msg.data)
+		cvs_vals = ','.join(map(str, msg_vals))  # Convert each item to str then join with ','
 
 		# Check if we need to start a new file
 		if datetime.now() > self.deadline_new_file:
@@ -69,7 +72,7 @@ class DataReceiver(WebSocketBaseClient, Thread):
 
 		# Write the parsed message to the file
 		try:  # In case the file has been closed (user stopped data collection), surround by try-except
-			self.output_file_handle.write(s + ',')
+			self.output_file_handle.write(cvs_vals + ',')
 		except Exception as e:
 			logger.error("Couldn't write to '{}'. Error: {}".format(self.output_filename, e))
 		logger.debug("Received data from '{}'!".format(self.url))
@@ -81,6 +84,7 @@ class DataReceiver(WebSocketBaseClient, Thread):
 			logger.error("Error closing the socket '{}' (probably the host was unreachable). Reason: {}".format(self.url, e))
 
 	def closed(self, code, reason=None):
+		self.deadline_new_file = datetime.now()  # Even if a reconnect happens before the current deadline, force the creation of a new file, instead of the 'reconnected' data being appended to the current file
 		if self.output_file_handle:
 			self.output_file_handle.close()
 			self.output_file_handle = None
