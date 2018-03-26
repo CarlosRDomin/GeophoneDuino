@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 
+<script src="workerBlobToArr.js"></script>
 <script src="helperFuncs.js"></script>
 <!-- Plotly.js and jQuery -->
 <script>addLibScripts([['https://cdn.plot.ly/plotly-latest.min.js', 'lib/plotly.min.js'], ['https://code.jquery.com/jquery-3.3.1.min.js', 'lib/jquery.min.js']]);</script>
@@ -10,40 +11,56 @@
 	var F_SAMP = 10000, X_RANGE_IN_SEC = 5;
 	var Y_MIN = 0, Y_MAX = 4095;
 	var arrData = {x_millis: [], x: [], y: []};
-	var ws;
+	var ws, workerUpdatePlot;
 
 	function createWebSocket(connectTo) {
 		ws = new WebSocket(connectTo);
 		ws.hasReceivedAnyMessagesYet = false;
 
 		ws.onopen = function() {
-			// Web Socket is connected
 			// WebSocket is connected
 			console.log("Successfully connected to " + ws.url);
 		};
 
 		ws.onmessage = function(evt) {
-			if (!ws.hasReceivedAnyMessagesYet) {
-				Plotly.relayout(GRAPH_ID, {
-					title: evt.data,
-					'yaxis.range': [Y_MIN, Y_MAX]
-				});
+			if (!ws.hasReceivedAnyMessagesYet) {	// First message contains GeophoneID, use it as title and exit (no data yet)
 				ws.hasReceivedAnyMessagesYet = true;
+				Plotly.relayout(GRAPH_ID, { title: evt.data });
+				
+				workerUpdatePlot = createNewWorker();	// After the first message is received, create a worker thread to periodically update the Plotly graph
+				workerUpdatePlot.onmessage = function(e) {
+					var updateGraph = function() {
+						dataUpdateGraph();
+						setTimeout(updateGraph, 50);
+					};
+					updateGraph();
+				};
+				workerUpdatePlot.postMessage({cmd: 'plot', scriptPath: getWorkerScriptPath()});	// Start the replotting trigger
 				return;
 			}
 
-			var geophoneVal = JSON.parse(evt.data);
-			var now = Date.now();
-
-			arrData.x_millis.push(now);
-			arrData.x.push((now - arrData.x_millis[0])/1000.0);
-			arrData.y.pushArray(geophoneVal);
-
-			//dataUpdateGraph();
+			var workerThread = createNewWorker();
+			
+			workerThread.onmessage = function(e) {
+				var lastT = (arrData.x.length>0)? arrData.x[arrData.x.length-1] : -1/F_SAMP;	// Get the time of the last data point
+				
+				arrData.x_millis.push(Date.now());	// Save the new results
+				arrData.x.pushArray(Array.from(Array(e.data.binData.length), (e,i) => lastT + (i+1)/F_SAMP));
+				arrData.y.pushArray(e.data.binData);
+				
+				workerThread.terminate();	// Terminate the thread
+			};
+			
+			// Pass a message to process the packet in the worker thread we just created
+			workerThread.postMessage({cmd: 'parse', blob: evt.data, toType: 'uint16_t', scriptPath: getWorkerScriptPath()});
 		};
 
 		ws.onclose = function() {
-		  // websocket is closed.
+		  // WebSocket is closed.
+			if (workerUpdatePlot) workerUpdatePlot.terminate();
+			workerUpdatePlot = null;
+
+			console.log("WebSocket closed!");
 		};
 
 		ws.onerror = function(err) {
@@ -54,9 +71,7 @@
 	}
 
 	function wsClose() {
-		if (ws) {
-			ws.close();
-		}
+		if (ws) ws.close();
 		ws = null;
 	}
 
@@ -65,38 +80,36 @@
 		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
 	}
 
-	function dataUpdateGraph(forceUpdate=false) {
+	function dataUpdateGraph(forceUpdate=false, plotOnlyRecent=true) {
 		if (!forceUpdate && (!ws || ws.readyState !== ws.OPEN)) return;	// Only update graph if socket is open (meaning we have something to update). Otherwise, user can't scroll/pan through data after closing the socket!
+		var LEN_VISIBLE = X_RANGE_IN_SEC*F_SAMP;	// Store how many data points should be visible at the current zoom level
 		var len = arrData.y.length;
-		var nowInSecs = arrData.x[len-1];
+		var startSlice = Math.max(0, plotOnlyRecent*(len-LEN_VISIBLE));	// If plotOnlyRecent is false, startSlice will be 0 (whole array); otherwise, slice only the last LEN_VISIBLE points
+		//var nowInSecs = arrData.x[len-1];
 
 		Plotly.update(GRAPH_ID, {
-			//x: [arrData.x],
-			y: [arrData.y]
+			x: [arrData.x.slice(startSlice)],
+			y: [arrData.y.slice(startSlice)]	// Only plot the last 100k points for faster performance
 		}, {
 			//'xaxis.range': [nowInSecs-X_RANGE_IN_SEC, nowInSecs]
-			'xaxis.range': [len-X_RANGE_IN_SEC*F_SAMP, len]
+			//'xaxis.range': [len-X_RANGE_IN_SEC*F_SAMP, len]
 		});
 	}
 
 	function dataDownload() {
+		if (arrData.y.length <= 0) return;	// Nothing to download
 		var title = $("#" + GRAPH_ID)[0].layout.title;
-        var filename = title + '.csv';
+		var d = new Date(arrData.x_millis[0]);	// Date at which the data collection started
+		function twoDigit(n) { return ('0' + n).slice(-2); }	// Helper function to convert 1-digit numbers to 2-digit strings (eg: 2->'02')
+		var strDate = [d.getFullYear(), d.toLocaleString('en-US', {month: 'short'}), twoDigit(d.getDate())].join('-');
+		var strTime = [twoDigit(d.getHours()), twoDigit(d.getMinutes()), twoDigit(d.getSeconds())].join('-');
+        var filename = [title, strDate, strTime].join('_') + '.csv';
 
-		var delimiter = '\n';
-        var csv = arrData.y.join(delimiter);
-        if (csv == null) return;
-
-        if (!csv.match(/^data:text\/csv/i)) {
-            csv = 'data:text/csv;charset=utf-8,' + csv;
-        }
-        var data = encodeURI(csv);
-
+		var url = URL.createObjectURL(new Blob([arrData.y.join('\n')], {type: 'text/csv; charset=utf-8;'}));
         var link = document.createElement('a');
-        link.setAttribute('href', data);
+        link.setAttribute('href', url);
         link.setAttribute('download', filename);
-        link.setAttribute('target', '_blank');
-        link.click();
+        link.click();	// Start the download
 	}
 
 	function dataClear() {
