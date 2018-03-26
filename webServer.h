@@ -5,6 +5,7 @@
 #include "main.h"						// Global includes and definitions
 #include "GPIO.h"						// GPIO library so HTTP server can change IO state upon request
 #include "WiFi.h"						// WiFi library needed for secret settings (to detect which interface a client is connected on, WLAN or AP)
+#include "FFT.h"						// FFT library in case we also want to stream the FFT of the ADC data
 #include <ESPAsyncWebServer.h>			// HTTP web server
 #include <ESP8266HTTPUpdateServer.h>	// OTA (upload firmware through HTTP browser over WiFi)
 #include <FS.h>							// SPIFFS file system (to read/write to flash)
@@ -16,6 +17,7 @@
 #define PORT_WEBSERVER				80		// Port for the webServer
 #define PORT_WEBSOCKET_GEOPHONE		81		// Port for the webSocket for real-time geophone streaming purposes
 #define PORT_WEBSOCKET_CONSOLE		82		// Port for the webSocket to which debug Serial.print messages are forwarded
+#define PORT_WEBSOCKET_FFT			90		// Port for the webSocket for real-time geophone FFT streaming purposes
 #define PORT_ARDUINO_OTA			8266	// Port recognized by Arduino IDE which allows remote firmware flashing
 #define WEB_FILE_EDITOR_USERNAME	SF("PEILab")
 #define WEB_FILE_EDITOR_PASS		SF("geophone")

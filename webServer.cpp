@@ -3,9 +3,10 @@
 
 bool shouldReboot = false;
 bool sendBinDataAsString = false;
+bool sendFFT = true;
 char hostName[32];
 AsyncWebServer webServer(PORT_WEBSERVER);
-WebSocketsServer webSocketGeophone(PORT_WEBSOCKET_GEOPHONE), webSocketConsole(PORT_WEBSOCKET_CONSOLE);
+WebSocketsServer webSocketGeophone(PORT_WEBSOCKET_GEOPHONE), webSocketFFT(PORT_WEBSOCKET_FFT), webSocketConsole(PORT_WEBSOCKET_CONSOLE);
 
 
 /***************************************************/
@@ -18,7 +19,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	} else {
 		consolePrintF("SPIFFS loaded!\n");
 	}
-	
+
 	// Initialize hostName
 	if (UNIQUE_HOSTNAME) {
 		sprintf(hostName, "Geophone-%06X", ESP.getChipId());
@@ -38,7 +39,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 			consolePrintF("Unable to start mDNS :(\n");
 		}
 	#endif
-	
+
 	// Start servers and websockets
 	/*webServer.on(SF("/sound_on").c_str(), HTTP_GET, [](AsyncWebServerRequest* request){ turnSound(true, request); });
 	webServer.on(SF("/sound_off").c_str(), HTTP_GET,  [](AsyncWebServerRequest* request){ turnSound(false, request); });
@@ -124,6 +125,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 		ArduinoOTA.begin();
 	#endif
 	
+	webSocketFFT.begin();
 	webSocketGeophone.begin();
 	webSocketGeophone.onEvent(webSocketGeophoneEvent);
 	webSocketConsole.begin();
@@ -164,7 +166,7 @@ bool renameFileUpload(String fileName) {	// Renames the last file uploaded to th
 		SPIFFS.remove(fileName);
 		consolePrintF("\t(File already existed, removing old version -> Overwriting)\n");
 	}
-	
+
 	bool r = SPIFFS.rename(UPLOAD_TEMP_FILENAME, fileName);
 	consolePrintF("%s temporary file %s -> %s\n\n", (r? SF("Successfully renamed"):SF("Couldn't rename")).c_str(), UPLOAD_TEMP_FILENAME, fileName.c_str());
 
@@ -176,7 +178,7 @@ void webServerWLANscan(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 		"\"currWLAN\":{\"ssid\":\"") + String(wlanSSID) + F("\",\"pass\":\"") + String(wlanPass) + F("\",\"ip\":\"") + wlanMyIP.toString() + F("\",\"gateway\":\"") + wlanGateway.toString() + F("\",\"mask\":\"") + wlanMask.toString() + F("\"},"
 		"\"nets\":[");
 	int n = WiFi.scanComplete();
-	
+
 	if (n == -2) {
 		WiFi.scanNetworks(true);
 	} else {
@@ -311,7 +313,23 @@ void processWebServer() {	// "webServer.loop()" function: handle incoming OTA co
 		} else {
 			webSocketGeophone.broadcastBIN(reinterpret_cast<uint8_t*>(geophone_buf[buf_id]), sizeof(uint16_t)*GEOPHONE_BUF_SIZE);
 		}
+
+		performFFT(buf_id);
+
+		if (sendBinDataAsString) {
+			String strWebSocket = "[" + String(fft_real[0]);
+			for (uint16_t i=1; i<=N_FFT/2; ++i) {
+				strWebSocket += "," + String(fft_real[i]);
+			}
+			strWebSocket += "]";
+
+			webSocketFFT.broadcastTXT(strWebSocket);
+			strWebSocket = String();
+		} else {
+			webSocketFFT.broadcastBIN(reinterpret_cast<uint8_t*>(fft_real), sizeof(double)*(1 + N_FFT/2));
+		}
 	}
+	webSocketFFT.loop();
 	webSocketGeophone.loop();
 	webSocketConsole.loop();
 
