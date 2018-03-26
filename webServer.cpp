@@ -1,7 +1,8 @@
-/******      Public settings      ******/
+/******      Web server config      ******/
 #include "webServer.h"
 
 bool shouldReboot = false;
+bool sendBinDataAsString = false;
 char hostName[32];
 AsyncWebServer webServer(PORT_WEBSERVER);
 WebSocketsServer webSocketGeophone(PORT_WEBSOCKET_GEOPHONE), webSocketConsole(PORT_WEBSOCKET_CONSOLE);
@@ -14,6 +15,8 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	// Initialize file system, so we can read/write config and web files
 	if (!SPIFFS.begin()) {
 		consolePrintF("Failed to mount file system!!\n");
+	} else {
+		consolePrintF("SPIFFS loaded!\n");
 	}
 	
 	// Initialize hostName
@@ -25,11 +28,14 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 
 	// Setup mDNS so we don't need to know its IP
 	#if USE_MDNS
+		consolePrintF("Starting mDNS... ");
 		if (MDNS.begin(hostName)) {
-			consolePrintF("Starting mDNS, you can now also contact me through 'http://%s.local'\n", hostName);
+			consolePrintF("Started! you can now also contact me through 'http://%s.local'\n", hostName);
 			MDNS.addService(F("http"), F("tcp"), PORT_WEBSERVER);
 			MDNS.addService(F("ws"), F("tcp"), PORT_WEBSOCKET_GEOPHONE);
 			MDNS.addService(F("ws"), F("tcp"), PORT_WEBSOCKET_CONSOLE);
+		} else {
+			consolePrintF("Unable to start mDNS :(\n");
 		}
 	#endif
 	
@@ -42,7 +48,7 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	webServer.on(SF("/WiFiSave").c_str(), HTTP_POST, webServerWLANsave);
 	webServer.on(SF("/heap").c_str(), HTTP_GET, [](AsyncWebServerRequest* request) { AsyncWebServerResponse* response = request->beginResponse(200, CONT(TYPE_PLAIN), String(ESP.getFreeHeap()) + F(" B")); addNoCacheHeaders(response); response->addHeader(F("Refresh"), F("2")); request->send(response); });
 	webServer.on(SF("/restart").c_str(), HTTP_GET, [](AsyncWebServerRequest* request) { AsyncWebServerResponse* response = request->beginResponse(200, contentType_P[TYPE_PLAIN], F("Restarting!")); addNoCacheHeaders(response); response->addHeader(F("Refresh"), F("15; url=/heap")); request->send(response); shouldReboot = true; });
-	
+
 	webServer.serveStatic("/", SPIFFS, "/www/", "public, max-age=1209600").setDefaultFile("index.html");	// Cache for 2 weeks :)
 
 	webServer.on("/OTA", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -75,13 +81,13 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 			}
 		}
 	});
-	
+
 	webServer.on(SF("/upload").c_str(), HTTP_GET, [](AsyncWebServerRequest* request){ if (SPIFFS.exists(F("/upload.html"))) { request->send(SPIFFS, F("/upload.html")); } else { request->send(200, contentType_P[TYPE_HTML], F("<html><head><link rel=\"stylesheet\" href=\"css/styles.css\"></head><body><h1>Secret file uploader</h1><form method=\"POST\" action=\"upload\" enctype=\"multipart/form-data\"><p>New file name: <input type=\"text\" placeholder=\"/\" name=\"fileName\" value=\"\" /><br><input type=\"file\" name=\"fileContent\" value=\"\" /><br><input type=\"submit\" value=\"Upload file\" /></p></form></body></html>")); } });
 	webServer.on(SF("/upload").c_str(), HTTP_POST, [](AsyncWebServerRequest* request){ bool ok = renameFileUpload(request->arg(F("fileName"))); request->redirect(SF("upload?f=") + request->arg(F("fileName")) + F("&ok=") + ok); }, handleFileUpload);
 	webServer.addHandler(new SPIFFSEditor(WEB_FILE_EDITOR_USERNAME, WEB_FILE_EDITOR_PASS));
 
 	webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, CONT(TYPE_PLAIN), SF("Not found: ") + request->url()); });
-	
+
 	webServer.begin();
 
 	// Also, setup Arduino's OTA (only works from their IDE)
@@ -136,12 +142,12 @@ void addNoCacheHeaders(AsyncWebServerResponse* response) {	// Add specific heade
 
 void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {	// Allows user to upload a file to the SPIFFS (so we don't have to write the whole Flash via USB)
 	static File fUpload;
-	
+
 	if (!index) {
 		consolePrintF("\nUploading new SPIFFS file (to the temporary path %s) with filename %s\n", UPLOAD_TEMP_FILENAME, filename.c_str());
 		fUpload = SPIFFS.open(UPLOAD_TEMP_FILENAME, "w");
 	}
-	
+
 	if (fUpload)
 		fUpload.write(data, len);
 	if (final) {
@@ -164,37 +170,6 @@ bool renameFileUpload(String fileName) {	// Renames the last file uploaded to th
 
 	return r;
 }
-
-/*void secretSettingsWLANedit(AsyncWebServerRequest* request) {	// Handles secret HTTP page that allows me to change WLAN settings
-	if (!ensureSecretSettingsVisibility(webServer)) return;	// Make sure secret settings can only be accessed from the AP network (not through WLAN)
-
-	sendNoCacheHeaders(webServer);
-	webServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-	webServer.send(200, CONT(TYPE_HTML));
-	webServer.sendContent(F("<html><head><style>table{border-collapse: collapse;} th{text-align: right;} td{text-align: left;} th,td{padding: 3px 9px;}</style></head><body style='text-align: center;'><h1>WiFi secret config</h1><table align='center'>"));
-	webServer.sendContent(SF("<tr><th>SoftAP config:</th><td>") + SOFT_AP_SSID + F(" (") + WiFi.softAPIP().toString() + F(")</td></tr>"));
-	webServer.sendContent(SF("<tr><th>WLAN config:</th><td>") + WiFi.SSID() + F(" (") + WiFi.localIP().toString() + F(")</td></tr></table><br>"));
-
-	// Now perform a scan and show all available networks so user can pick which one to connect to
-	webServer.sendContent(F("<form method='POST' action='WiFiSave'><h3>Select WLAN network to connect to:</h3><table align='center'><tr><th>SSID:</th><td>"));
-	int n = WiFi.scanNetworks();
-	if (n > 0) {
-		String opts = F("<select name='ssidDropdown' style='height: 18pt; width: 100%;'>");
-		for (int i=0; i<n; ++i) {
-			opts += SF("<option value='") + WiFi.SSID(i) + F("'") + ((WiFi.SSID(i)==String(wlanSSID))? F(" selected"):F("")) + F(">") + ((WiFi.encryptionType(i)==ENC_TYPE_NONE)? F("&nbsp;&#10004;&nbsp;&nbsp; "):F("&#128274; ")) + WiFi.SSID(i) + F(" [") + WiFi.RSSI(i) + F("dB]</option>");
-		}
-		opts += SF("</select><br> or <br><input type='checkbox' name='ssidManualChk' id='ssidManualChk'> <label for='ssidManualChk'>Manual SSID:</label> ");
-		webServer.sendContent(opts);
-	} else {
-		webServer.sendContent(F("No WLAN networks found, gonna have to enter SSID manually:<br><input type='hidden' name='ssidManualChk' value='on'/>"));
-	}
-	webServer.sendContent(SF("<input type='text' placeholder='Network SSID' name='ssidManualTxt' value='") + String(wlanSSID) + F("'/></td></tr>"
-		"<tr><th>Password:</th><td><input type='password' placeholder='password' name='pass' value='") + String(wlanPass) + F("'/></td></tr>"
-		"<tr><th>Static IP:</th><td><input type='text' placeholder='Static IP' name='ip' value='") + wlanMyIP.toString() + F("'/></td></tr>"
-		"<tr><th>Gateway:</th><td><input type='text' placeholder='Gateway' name='gateway' value='") + wlanGateway.toString() + F("'/></td></tr>"
-		"<tr><th>Net mask:</th><td><input type='text' placeholder='Net mask' name='mask' value='") + wlanMask.toString() + F("'/></td></tr></table>"
-		"<p><input type='submit' value='Connect/Disconnect'/></p></form></body></html>"));
-}*/
 
 void webServerWLANscan(AsyncWebServerRequest* request) {	// Handles secret HTTP page that scans WLAN networks
 	String json = SF("{\"currAP\":{\"ssid\":\"") + SOFT_AP_SSID + F("\",\"ip\":\"") + WiFi.softAPIP().toString() + F("\"},"
@@ -221,7 +196,7 @@ void webServerWLANscan(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 			WiFi.scanNetworks(true);
 		}
 	}
-	
+
 	json += "]}";
 	AsyncWebServerResponse* response = request->beginResponse(200, CONT(TYPE_JSON), json);
 	addNoCacheHeaders(response);
@@ -230,10 +205,6 @@ void webServerWLANscan(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 }
 
 void webServerWLANsave(AsyncWebServerRequest* request) {	// Handles secret HTTP page that saves new WLAN settings
-	/*if (!ensureSecretSettingsVisibility(webServer)) return;	// Make sure secret settings can only be accessed from the AP network (not through WLAN)
-	if (webServer.method() != HTTP_POST)
-		return webServer.send(404, CONT(TYPE_PLAIN), SF("Not found: ") + webServer.uri());*/
-
 	consolePrintF("Received request to save new WLAN settings!\n");
 	bool bSSIDmanual = false;
 	if (request->hasArg(F("ssidManualChk"))) bSSIDmanual = (request->arg(SF("ssidManualChk"))=="on");
@@ -297,9 +268,24 @@ void consolePrintf(const char * format, ...) {	// Log messages through webSocket
 	Serial.printf(buf);
 }
 
-int constexpr precompute_strlen(const char* str) {
-    return *str ? 1 + precompute_strlen(str + 1) : 0;
-}
+/*void printCArray(uint16_t *bufIn, uint16_t bufInLen) {
+	char bufWebSocket[5002];
+	uint32_t t_start, t_end;
+	t_start = micros();
+
+	char bufAux[10];//, *bufEnd = bufWebSocket;
+	uint16_t bufLen = 0;
+
+	for (uint16_t i=0; i<bufInLen; ++i) {
+		bufLen += sprintf(bufWebSocket+bufLen, ",%d", bufIn[i]);
+	}
+	strcpy(bufWebSocket+bufLen, "]"); bufLen++;
+	strncpy(bufWebSocket, "[", 1);	// Replace initial "," by "["
+
+	t_end = micros();
+	consolePrintF("@t=%8d ms\t(deltaT=%6d us) -> Finished printCArray [last 10chars: %s;\ttotal len: %d]\n", millis(), t_end-t_start, bufWebSocket+bufLen-10, bufLen);
+	webSocketGeophone.broadcastTXT(bufWebSocket, bufLen);
+}*/
 
 void processWebServer() {	// "webServer.loop()" function: handle incoming OTA connections (if any), http requests and webSocket events
 	uint32_t t_msec = curr_time%1000, t_sec = curr_time/1000, t_min = t_sec/60, t_hr = t_min/60; t_sec %= 60; t_min %= 60;
@@ -312,13 +298,19 @@ void processWebServer() {	// "webServer.loop()" function: handle incoming OTA co
 	if (geophone_buf_got_full) {
 		geophone_buf_got_full = false;	// Remember to reset this flag so we only send when the next buffer is full ;)
 		unsigned int buf_id = !geophone_buf_id_current;	// Use the *opposite* buffer id of the one being filled currently (so we send the one that's already full)
-		String txtValue = "[" + String(geophone_buf[buf_id][0]);
-		
-		for (unsigned int i=1; i<GEOPHONE_BUF_SIZE; ++i) {
-			txtValue += "," + String(geophone_buf[buf_id][i]);	
+
+		if (sendBinDataAsString) {
+			String strWebSocket = "[" + String(geophone_buf[buf_id][0]);
+			for (unsigned int i=1; i<GEOPHONE_BUF_SIZE; ++i) {
+				strWebSocket += "," + String(geophone_buf[buf_id][i]);
+			}
+			strWebSocket += "]";
+
+			webSocketGeophone.broadcastTXT(strWebSocket);
+			strWebSocket = String();
+		} else {
+			webSocketGeophone.broadcastBIN(reinterpret_cast<uint8_t*>(geophone_buf[buf_id]), sizeof(uint16_t)*GEOPHONE_BUF_SIZE);
 		}
-		txtValue += "]";
-		webSocketGeophone.broadcastTXT(txtValue);
 	}
 	webSocketGeophone.loop();
 	webSocketConsole.loop();
