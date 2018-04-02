@@ -19,7 +19,7 @@
 
 		ws.onopen = function() {
 			// WebSocket is connected
-			console.log("Successfully connected to " + ws.url);
+			logMessage("Successfully connected to " + ws.url);
 		};
 
 		ws.onmessage = function(evt) {
@@ -52,12 +52,12 @@
 		};
 
 		ws.onclose = function() {
-		  // WebSocket is closed.
-			console.log("WebSocket closed!");
+			// WebSocket is closed.
+			logMessage("WebSocket closed! - <i>" + getStrCloseReason(event.code) + "</i>", true);
 		};
 
 		ws.onerror = function(err) {
-			console.log("Error in webSocket!");
+			logMessage("Error in webSocket!");
 		};
 
 		return ws;
@@ -70,7 +70,7 @@
 
 	function wsReconnect() {
 		wsClose();
-		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/geophone");
+		ws = createWebSocket("ws://" + $('#wsHost')[0].value + ":" + $('#wsPort')[0].value + "/fft");
 	}
 
 	function updateYlims() {
@@ -141,8 +141,10 @@
 </head>
 
 <body>
-	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
 	<table style="border: none;">
+		<tr>
+			<td colspan="2"><p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p></td>
+		</tr>
 		<tr>
 			<td><div id="graphRawFFT" style="width: 600px; height: 400px;"></div></td>
 			<td><fieldset><legend>Vertical zoom</legend>
@@ -170,6 +172,14 @@
 					<td align="left"><input type="number" id="zoomYminProc" min="0" max="99999" value="0" style="width: 50px;"></td>
 					</tr>
 				</table>
+				</fieldset>
+			</td>
+		</tr>
+		<tr>
+			<td colspan="2">
+				<fieldset style="width: 85%; margin: auto; margin-top: 10px;"><legend>Log</legend>
+					<div style="text-align: left; width:100%; padding: 5px; margin: auto; /*margin auto centers the div horizontally :)*/ max-height: 250px; overflow: auto;" id="textAreaLog"></div>
+					<p><input type="checkbox" checked id="chkAutoScrollLog"> <label for="chkAutoScrollLog">Auto-scroll</label><input type="button" onClick="javascript: clearLog();" value="Clear log" style="margin-left: 20px; width: 100px;"></p>
 				</fieldset>
 			</td>
 		</tr>

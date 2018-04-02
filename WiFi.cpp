@@ -110,7 +110,7 @@ void saveWLANconfig() {	// Save WLAN credentials to EEPROM
 }
 
 void processWiFi() {	// "WiFi.loop()" function: tries to reconnect to known networks if haven't been able to do so for the past WIFI_T_RECONNECT ms and createWiFiAP == false
-	if (curr_time>tNextWiFiReconnectAttempt && giveUpOnWLAN<2 && !WiFi.isConnected()) {
+	if (!WiFi.isConnected() && curr_time>tNextWiFiReconnectAttempt && giveUpOnWLAN<2) {
 		connectToWLAN();// If we haven't been able to successfully connect to the WLAN, retry after tNextWiFiReconnectAttempt
 	}
 }

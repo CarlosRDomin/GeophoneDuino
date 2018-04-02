@@ -45,7 +45,9 @@ p {
 	line-height: 1em; }
 
 table {
-	border-collapse: collapse; }
+	border-collapse: collapse;
+	border: none;
+	margin: auto; }
 
 table.center {
 	margin-left:  auto; 
@@ -117,3 +119,6 @@ progress[value]::-webkit-progress-bar {
 progress[value]::-webkit-progress-value {
 	background: #c0c0c0;
 	border-radius: 8px; }
+
+hr {
+	margin: 3px 20px; }

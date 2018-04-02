@@ -19,6 +19,8 @@ void setup() {
 	setupWiFi();
 	setupWebServer();
 	setupIOpins();
+
+	delay(1000);
 }
 
 

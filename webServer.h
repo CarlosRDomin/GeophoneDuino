@@ -5,7 +5,6 @@
 #include "main.h"						// Global includes and definitions
 #include "GPIO.h"						// GPIO library so HTTP server can change IO state upon request
 #include "WiFi.h"						// WiFi library needed for secret settings (to detect which interface a client is connected on, WLAN or AP)
-#include "FFT.h"						// FFT library in case we also want to stream the FFT of the ADC data
 #include <ESPAsyncWebServer.h>			// HTTP web server
 #include <ESP8266HTTPUpdateServer.h>	// OTA (upload firmware through HTTP browser over WiFi)
 #include <FS.h>							// SPIFFS file system (to read/write to flash)
@@ -25,6 +24,10 @@
 #define USE_MDNS					false	// Whether or not to use mDNS (allows access to the arduino through a name without knowing its IP)
 #define UNIQUE_HOSTNAME				true	// If true, use ESP.getChipId() to create a unique hostname; Otherwise, use "GeophoneDuino"
 #define UPLOAD_TEMP_FILENAME		"/tmp.file"	// Temporary file name given to a file uploaded through the web server. Once we receive its desired path, we'll rename it (move it)
+
+#if DO_FFT
+#include "FFT.h"					// FFT library in case we also want to stream the FFT of the ADC data
+#endif
 
 #if USE_ARDUINO_OTA
 #include <ArduinoOTA.h>				// OTA (upload firmware through Arduino IDE over WiFi)
@@ -48,7 +51,7 @@ void setupWebServer();	// Initializes hostName, mDNS, HTTP server, OTA methods (
 /******      	Web server related functions      	******/
 /*********************************************************/
 void addNoCacheHeaders(AsyncWebServerResponse* response);	// Add specific headers to an http response to avoid caching
-void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);	// Allows user to upload a file to the SPIFFS (so we don't have to write the whole Flash via USB)
+void handleFileUpload(AsyncWebServerRequest* request, String filename, size_t index, uint8_t * data, size_t len, bool final);	// Allows user to upload a file to the SPIFFS (so we don't have to write the whole Flash via USB)
 bool renameFileUpload(String fileName);	// Renames the last file uploaded to the new file name provided
 void webServerWLANscan(AsyncWebServerRequest* request);	// Handles secret HTTP page that scans WLAN networks
 void webServerWLANsave(AsyncWebServerRequest* request);	// Handles secret HTTP page that saves new WLAN settings

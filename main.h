@@ -8,6 +8,7 @@
 #define SF(literal)		String(F(literal))			// Macro to save a string literal in Flash memory and convert it to String when reading it
 #define CF(literal)		String(F(literal)).c_str()	// Macro to save a string literal in Flash memory and convert it to char* when reading it
 #define SFPSTR(progmem)	String(FPSTR(progmem))		// Macro to convert a PROGMEM string (in Flash memory) to String
+#define DO_FFT			false						// Whether or not to perform FFT of the time-domain ADC signal
 
 extern uint32_t curr_time;
 

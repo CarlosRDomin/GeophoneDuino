@@ -19,7 +19,7 @@
 
 		ws.onopen = function() {
 			// WebSocket is connected
-			console.log("Successfully connected to " + ws.url);
+			logMessage("Successfully connected to " + ws.url);
 		};
 
 		ws.onmessage = function(evt) {
@@ -55,16 +55,16 @@
 			workerThread.postMessage({cmd: 'parse', blob: evt.data, toType: 'uint16_t', scriptPath: getWorkerScriptPath()});
 		};
 
-		ws.onclose = function() {
-		  // WebSocket is closed.
+		ws.onclose = function(event) {
+			// WebSocket is closed.
 			if (workerUpdatePlot) workerUpdatePlot.terminate();
 			workerUpdatePlot = null;
 
-			console.log("WebSocket closed!");
+			logMessage("WebSocket closed! - <i>" + getStrCloseReason(event.code) + "</i>", true);
 		};
 
 		ws.onerror = function(err) {
-			console.log("Error in webSocket!");
+			logMessage("Error in webSocket! Check closing message below for extra info");
 		};
 
 		return ws;
@@ -128,11 +128,6 @@
 		});
 	}
 
-	// Helper function that allows pushing an array to an existing array
-	Array.prototype.pushArray = function(arr) {
-		this.push.apply(this, arr);
-	};
-
 	function jQueryAssignDocumentReady() {
 		$(document).ready(function() {
 			Plotly.plot(GRAPH_ID, [{
@@ -178,8 +173,10 @@
 </head>
 
 <body>
-	<p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p>
 	<table style="border: none;">
+		<tr>
+			<td colspan="2"><p><input type="text" id="wsHost" style="width: 200px;">:<input type="number" id="wsPort" min="1" max="65535" style="width: 50px;"><input type="button" value="(Re)connect" onClick="javascript: wsReconnect();" style="margin-left: 20px; width: 100px;"><input type="button" value="Close socket" onClick="javascript: wsClose();" style="margin-left: 10px; width: 100px;"></p></td>
+		</tr>
 		<tr>
 			<td><div id="geophone-graph" style="width: 600px; height: 400px;"></div></td>
 			<td><fieldset><legend>Vertical zoom</legend>
@@ -199,7 +196,17 @@
 				</fieldset>
 			</td>
 		</tr>
+		<tr>
+			<td colspan="2"><p><input type="button" value="Clear data" style="width: 100px;" onClick="javascript: dataClear();"><input type="button" value="Save data" style="margin-left: 10px; width: 100px;" onClick="javascript: dataDownload();"></p></td>
+		</tr>
+		<tr>
+			<td colspan="2">
+				<fieldset style="width: 85%; margin: auto; margin-top: 10px;"><legend>Log</legend>
+					<div style="text-align: left; width:100%; padding: 5px; margin: auto; /*margin auto centers the div horizontally :)*/ max-height: 250px; overflow: auto;" id="textAreaLog"></div>
+					<p><input type="checkbox" checked id="chkAutoScrollLog"> <label for="chkAutoScrollLog">Auto-scroll</label><input type="button" onClick="javascript: clearLog();" value="Clear log" style="margin-left: 20px; width: 100px;"></p>
+				</fieldset>
+			</td>
+		</tr>
 	</table>
-	<p><input type="button" value="Clear data" style="width: 100px;" onClick="javascript: dataClear();"><input type="button" value="Save data" style="margin-left: 10px; width: 100px;" onClick="javascript: dataDownload();"></p>
 </body>
 </html>

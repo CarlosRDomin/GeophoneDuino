@@ -26,7 +26,7 @@ void setupTimer1() {
 	timer1_isr_init();
 	timer1_attachInterrupt(sample_isr);
 	timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
-	timer1_write(clockCyclesPerMicrosecond() / 16 * 50); //80us = 12.5kHz sampling freq
+	timer1_write(clockCyclesPerMicrosecond() / 16 / 2 * 100); //100us = 10kHz sampling freq
 }
 
 static inline void setDataBits(uint16_t bits) {
