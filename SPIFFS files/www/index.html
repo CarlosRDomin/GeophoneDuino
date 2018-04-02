@@ -11,6 +11,7 @@
 	var F_SAMP = 10000, X_RANGE_IN_SEC = 5;
 	var Y_MIN = 0, Y_MAX = 4095;
 	var arrData = {x_millis: [], x: [], y: []};
+	var lastMsgId = null;
 	var ws, workerUpdatePlot;
 
 	function createWebSocket(connectTo) {
@@ -20,6 +21,7 @@
 		ws.onopen = function() {
 			// WebSocket is connected
 			logMessage("Successfully connected to " + ws.url);
+			lastMsgId = null;	// Reset msgId counter
 		};
 
 		ws.onmessage = function(evt) {
@@ -42,7 +44,16 @@
 			var workerThread = createNewWorker();
 			
 			workerThread.onmessage = function(e) {
+				var msgId = e.data.binData[0];
+				var numPacketsLost = (lastMsgId == null)? 0:(msgId-lastMsgId-1);	// Should be 0 :)
 				var lastT = (arrData.x.length>0)? arrData.x[arrData.x.length-1] : -1/F_SAMP;	// Get the time of the last data point
+				
+				if (numPacketsLost > 0) {	// msgId should be lastMsgId+1, otherwise detect an error!
+					logMessage('WARNING: ' + numPacketsLost + ' packet(s) lost! (Last msg ID was ' + lastMsgId + '; current ID is ' + msgId + ')');
+					lastT += numPacketsLost * e.data.binData.length/F_SAMP;
+				}
+				lastMsgId = msgId;	// Update msgId counter
+				e.data.binData = e.data.binData.subarray(1);	// "pop" the first element (which contains the message ID)
 				
 				arrData.x_millis.push(Date.now());	// Save the new results
 				arrData.x.pushArray(Array.from(Array(e.data.binData.length), (e,i) => lastT + (i+1)/F_SAMP));
