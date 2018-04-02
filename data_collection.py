@@ -20,6 +20,7 @@ class DataReceiver(WebSocketBaseClient, Thread):
 		self.url = url
 		self.init_args = args  # Store the initialization args and kwargs so we can re-init the websocket later
 		self.init_kwargs = kwargs
+		self.last_msg_id = None
 		self.output_filename = ''
 		self.output_file_handle = None
 		self.deadline_new_file = datetime.now()
@@ -57,6 +58,8 @@ class DataReceiver(WebSocketBaseClient, Thread):
 		# Parse the message: '<' for Little-Endian, 'H' for uint16_t
 		msg_format = '<' + 'H'*(len(msg.data)/2)
 		msg_vals = unpack(msg_format, msg.data)
+		msg_id = msg_vals[0]
+		msg_vals = msg_vals[1:]
 		cvs_vals = ','.join(map(str, msg_vals))  # Convert each item to str then join with ','
 
 		# Check if we need to start a new file
@@ -75,7 +78,13 @@ class DataReceiver(WebSocketBaseClient, Thread):
 			self.output_file_handle.write(cvs_vals + ',')
 		except Exception as e:
 			logger.error("Couldn't write to '{}'. Error: {}".format(self.output_filename, e))
-		logger.debug("Received data from '{}'!".format(self.url))
+
+		if self.last_msg_id is not None and msg_id != self.last_msg_id + 1:
+			logger.notice("Received data from '{}' (msg ID {})! WARNING: {} packet(s) lost: last msg ID was {}!".format(self.url, msg_id, msg_id-self.last_msg_id-1, self.last_msg_id))
+		else:
+			logger.debug("Received data from '{}' (msg ID {})!".format(self.url, msg_id))
+		self.last_msg_id = msg_id
+
 
 	def close(self, code=1000, reason=''):
 		try:
