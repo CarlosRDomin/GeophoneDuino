@@ -9,7 +9,7 @@
 #define GEOPHONE_BUF_SIZE	1000
 #define PWM_RANGE			1023
 
-extern uint16_t geophone_buf[2][GEOPHONE_BUF_SIZE];	// ADC data buffer, double buffered
+extern uint16_t geophone_buf[2][GEOPHONE_BUF_SIZE+1];	// ADC data buffer, double buffered
 extern unsigned int geophone_buf_id_current;	// Which data buffer is being used for the ADC (the other is being sent)
 extern unsigned int geophone_buf_pos;	// Position (index) in the ADC data buffer
 extern uint16_t geophone_buf_num_sent;

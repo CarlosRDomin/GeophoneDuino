@@ -1,9 +1,9 @@
 /******      GPIO      ******/
 #include "GPIO.h"
 
-uint16_t geophone_buf[2][GEOPHONE_BUF_SIZE];	// ADC data buffer, double buffered
+uint16_t geophone_buf[2][GEOPHONE_BUF_SIZE+1];	// ADC data buffer, double buffered
 unsigned int geophone_buf_id_current = 0;	// Which data buffer is being used for the ADC (the other is being sent)
-unsigned int geophone_buf_pos = 0;	// Position (index) in the ADC data buffer
+unsigned int geophone_buf_pos = 1;	// Position (index) in the ADC data buffer (start at 1 because [0] keeps track of geophone_buf_num_sent)
 uint16_t geophone_buf_num_sent = 0;
 bool geophone_buf_got_full = false;	// Flag to signal that a buffer is ready to be sent
 bool printGeophoneDebug = false;
@@ -90,8 +90,10 @@ void ICACHE_RAM_ATTR sample_isr() {
 
 	// If the buffer is full, switch to the other one and signal that it's ready to be sent
 	if (geophone_buf_pos > sizeof(geophone_buf[0])/sizeof(geophone_buf[0][0])) {
-		geophone_buf_pos = 0;
+		//wsGeophone.binaryAll(reinterpret_cast<uint8_t*>(geophone_buf[geophone_buf_id_current]), sizeof(geophone_buf[0]));
+		geophone_buf_pos = 1;
 		geophone_buf_id_current = !geophone_buf_id_current;
+		geophone_buf[geophone_buf_id_current][0] = (++geophone_buf_num_sent);
 		geophone_buf_got_full = true;
 	}
 }
