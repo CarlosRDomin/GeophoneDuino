@@ -26,6 +26,9 @@ from subprocess import call
 from log_helper import logger
 
 
+ESP_BOARD_FOLDER = os.path.abspath("submodules/hardware/esp8266com/esp8266")
+
+
 def get_default_Arduino_path():
     USER_DIR = os.path.expanduser('~')
     if platform.system() == "Linux":
@@ -57,6 +60,20 @@ def get_src_and_dst_paths(ARDUINO_DIR, subdir):
     return src_paths, dst_paths
 
 
+def make_symlink(src, dst):
+    if os.path.exists(dst):  # If dst file/folder already exists, decide between:
+        if not os.path.islink(dst):  # If the file/folder is not a symlink and already existed, leave it as is
+            logger.warning("{} exists and is not a symbolic link - not overwriting".format(dst))
+            return
+        else:  # If it was a symlink, just "refresh" (update) it
+            logger.verbose("Unlinking {} first".format(dst))
+            os.unlink(dst)
+
+    # Create symbolic link
+    logger.debug("Creating new symbolic link {}".format(dst))
+    os.symlink(src, dst)
+
+
 def create_symlinks(ARDUINO_DIR, subdir):
     ACTUAL_DIR = os.path.join(ARDUINO_DIR, subdir)  # Make it generic so we can symlink Arduino/libraries as well as Arduino/hardware
 
@@ -74,16 +91,7 @@ def create_symlinks(ARDUINO_DIR, subdir):
     # Create symbolic links
     src_paths, dst_paths = get_src_and_dst_paths(ARDUINO_DIR, subdir)
     for src, dst in zip(src_paths, dst_paths):
-        if os.path.exists(dst):  # If dst library folder already exists, decide between:
-            if not os.path.islink(dst):  # If the folder is not a symlink and already existed, leave it as is
-                logger.warning("{} exists and is not a symbolic link - not overwriting".format(dst))
-                continue
-            else:  # If it was a symlink, just "refresh" (update) it
-                logger.verbose("Unlinking {} first".format(dst))
-                os.unlink(dst)
-        # Create symbolic link
-        logger.debug("Creating new symbolic link {}".format(dst))
-        os.symlink(src, dst)
+        make_symlink(src, dst)
 
     logger.success("Done! :)")
     return True
@@ -110,7 +118,7 @@ def download_hardware_tools():
     # Download esp8266 tools (not part of the repo so `git submodule update` won't fetch them)
     logger.notice("Downloading additional esp8266 tools not included in the repo...")
     try:
-        esp_tools_folder = os.path.abspath("submodules/hardware/esp8266com/esp8266/tools")
+        esp_tools_folder = os.path.join(ESP_BOARD_FOLDER, "tools")
         cur_dir = os.path.abspath(os.curdir)  # Save a copy of the current dir so we can return after the script is run
         os.chdir(esp_tools_folder)  # Enter the directory
         sys.path.insert(0, esp_tools_folder)  # Add it to the PATH so get.py can be imported
@@ -160,6 +168,7 @@ if __name__ == "__main__":
                 logger.critical("Installation failed! :( Please see errors above and fix them before trying again.")
                 exit(-1)
         # And perform additional steps (install esp8266 tools and SPIFFS plugin)
+        make_symlink(os.path.abspath("platform.local.txt"), os.path.join(ESP_BOARD_FOLDER, "platform.local.txt"))  # Symlink platform.local.txt, with compiler extra flags for the libraries
         download_hardware_tools()
         install_plugins(args.path)
     elif args.remove:

@@ -1,0 +1,4 @@
+# Add extra flags for ArduinoWebSockets library. Explanation:
+#	WEBSOCKETS_NETWORK_TYPE=0 (NETWORK_ESP8266_ASYNC) makes the WebSocket asynchronous (much better :D)
+#	WEBSOCKETS_SERVER_CLIENT_MAX=2 reduces the default maximum number of clients each websocket can handle to save RAM
+compiler.cpp.extra_flags= -DWEBSOCKETS_NETWORK_TYPE=0 -DWEBSOCKETS_SERVER_CLIENT_MAX=2
