@@ -34,7 +34,6 @@
 #include <ESP8266mDNS.h>			// DNS (allows access to the arduino through a name without knowing its IP)
 #endif
 
-
 enum {TYPE_PLAIN=0, TYPE_HTML, TYPE_JSON, TYPE_CSS, TYPE_JS, TYPE_PNG, TYPE_GIF, TYPE_JPG, TYPE_ICO, TYPE_XML, TYPE_PDF, TYPE_ZIP, TYPE_GZ, TYPE_DLOAD};
 const char* const PROGMEM contentType_P[] = {"text/plain", "text/html", "text/json", "text/css", "application/javascript", "image/png", "image/gif", "image/jpeg", "image/x-icon", "text/xml", "application/x-pdf", "application/x-zip", "application/x-gzip", "application/octet-stream"};
 

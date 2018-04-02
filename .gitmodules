@@ -4,9 +4,6 @@
 [submodule "ESPAsyncTCP"]
 	path = submodules/libraries/ESPAsyncTCP
 	url = https://github.com/me-no-dev/ESPAsyncTCP.git
-[submodule "ArduinoJson"]
-	path = submodules/libraries/ArduinoJson
-	url = https://github.com/bblanchon/ArduinoJson.git
 [submodule "arduinoFFT"]
 	path = submodules/libraries/arduinoFFT
 	url = https://github.com/kosme/arduinoFFT.git

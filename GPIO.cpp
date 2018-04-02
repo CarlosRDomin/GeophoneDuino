@@ -82,34 +82,6 @@ static inline ICACHE_RAM_ATTR uint16_t transfer16() {
 /**********************************************/
 /******      GPIO related functions      ******/
 /**********************************************/
-
-/**** HTTP way to change settings (START) ****/
-bool lightsOn = false, soundOn = false;
-enum {TURN_LIGHTS, TURN_SOUND, TURN_RELAYS};
-
-void turnReplyHtml(uint8_t turnWhat, bool state, AsyncWebServerRequest* request) {
-	if (!request) return;
-	
-	static const char* const PROGMEM turnWhat_P[] = {"Lights ", "Sound ", "Relays "};
-	static const char* const PROGMEM url_P[] = {"lights_", "sound_", ""};
-	static const char* const PROGMEM state_P[] = {"off", "on"};
-	static const char* const PROGMEM plural_P[] = {"it", "them"};
-
-	/* Example response: Lights on!<br><a href='lights_off'>Click here to turn them back off</a> */
-	AsyncWebServerResponse* response = request->beginResponse(200, contentType_P[TYPE_HTML], SFPSTR(turnWhat_P[turnWhat]) + FPSTR(state_P[state]) + F("!<br><a href='") + FPSTR(url_P[turnWhat]) + FPSTR(state_P[!state]) + F("'>Click here to turn ") + FPSTR(plural_P[turnWhat!=1]) + F("back ") + FPSTR(state_P[!state]) + F("</a>"));
-	addNoCacheHeaders(response);	// Don't cache so if they want to turn lights/sound on/off the browser sends a new request
-	request->send(response);
-}
-
-void turnSound(bool on, AsyncWebServerRequest* request) {
-	soundOn = on;
-	int TEMP_PIN_SOUND = 1;
-	digitalWrite(TEMP_PIN_SOUND, !on);
-
-	turnReplyHtml(TURN_SOUND, on, request);
-}
-/**** HTTP way to change settings (END) ****/
-
 void ICACHE_RAM_ATTR sample_isr() {
 	// Read a sample from ADC and write it to the buffer
 	uint16_t val = transfer16();

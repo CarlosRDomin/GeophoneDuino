@@ -32,11 +32,5 @@ static inline ICACHE_RAM_ATTR uint16_t transfer16();
 void ICACHE_RAM_ATTR sample_isr();
 void processGPIO();								// "GPIO.loop()" function: reads inputs, processes them and writes outputs
 
-/**** HTTP way to change settings (START) ****/
-extern bool lightsOn, soundOn;
-void turnReplyHtml(uint8_t turnWhat, bool state, AsyncWebServerRequest *request);
-void turnSound(bool on, AsyncWebServerRequest* request=NULL);
-/**** HTTP way to change settings (END) ****/
-
 #endif
 

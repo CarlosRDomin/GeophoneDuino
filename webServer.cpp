@@ -41,9 +41,6 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 	#endif
 
 	// Start servers and websockets
-	/*webServer.on(SF("/sound_on").c_str(), HTTP_GET, [](AsyncWebServerRequest* request){ turnSound(true, request); });
-	webServer.on(SF("/sound_off").c_str(), HTTP_GET,  [](AsyncWebServerRequest* request){ turnSound(false, request); });
-	webServer.on(SF("/sound_toggle").c_str(), HTTP_GET, [](AsyncWebServerRequest* request){ turnSound(!soundOn, request); });*/
 	webServer.rewrite("/WiFi", "/WiFi.html");
 	webServer.on(SF("/WiFiNets").c_str(), HTTP_GET, webServerWLANscan);
 	webServer.on(SF("/WiFiSave").c_str(), HTTP_POST, webServerWLANsave);
@@ -269,25 +266,6 @@ void consolePrintf(const char * format, ...) {	// Log messages through webSocket
 	webSocketConsole.broadcastTXT(buf);
 	Serial.printf(buf);
 }
-
-/*void printCArray(uint16_t *bufIn, uint16_t bufInLen) {
-	char bufWebSocket[5002];
-	uint32_t t_start, t_end;
-	t_start = micros();
-
-	char bufAux[10];//, *bufEnd = bufWebSocket;
-	uint16_t bufLen = 0;
-
-	for (uint16_t i=0; i<bufInLen; ++i) {
-		bufLen += sprintf(bufWebSocket+bufLen, ",%d", bufIn[i]);
-	}
-	strcpy(bufWebSocket+bufLen, "]"); bufLen++;
-	strncpy(bufWebSocket, "[", 1);	// Replace initial "," by "["
-
-	t_end = micros();
-	consolePrintF("@t=%8d ms\t(deltaT=%6d us) -> Finished printCArray [last 10chars: %s;\ttotal len: %d]\n", millis(), t_end-t_start, bufWebSocket+bufLen-10, bufLen);
-	webSocketGeophone.broadcastTXT(bufWebSocket, bufLen);
-}*/
 
 void processWebServer() {	// "webServer.loop()" function: handle incoming OTA connections (if any), http requests and webSocket events
 	uint32_t t_msec = curr_time%1000, t_sec = curr_time/1000, t_min = t_sec/60, t_hr = t_min/60; t_sec %= 60; t_min %= 60;
