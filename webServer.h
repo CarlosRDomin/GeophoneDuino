@@ -9,7 +9,6 @@
 #include <ESP8266HTTPUpdateServer.h>	// OTA (upload firmware through HTTP browser over WiFi)
 #include <FS.h>							// SPIFFS file system (to read/write to flash)
 #include <SPIFFSEditor.h>				// Helper that provides the resources to view&edit SPIFFS files through HTTP
-#include <WebSocketsServer.h>			// WebSockets
 
 #define consolePrintF(s, ...)		consolePrintf(String(F(s)).c_str(), ##__VA_ARGS__)
 #define CONT(x)						String(FPSTR(contentType_P[x]))
@@ -20,6 +19,7 @@
 #define PORT_ARDUINO_OTA			8266	// Port recognized by Arduino IDE which allows remote firmware flashing
 #define WEB_FILE_EDITOR_USERNAME	SF("PEILab")
 #define WEB_FILE_EDITOR_PASS		SF("geophone")
+#define USE_NATIVE_WEBSOCKET_LIB	false	// True to use ESPAsyncWebServer's webSocket implementation, false for WebSocketsServer's
 #define USE_ARDUINO_OTA				false	// Whether or not to use Arduino's native IDE remote firmware flasher
 #define USE_MDNS					false	// Whether or not to use mDNS (allows access to the arduino through a name without knowing its IP)
 #define UNIQUE_HOSTNAME				true	// If true, use ESP.getChipId() to create a unique hostname; Otherwise, use "GeophoneDuino"
@@ -27,6 +27,10 @@
 
 #if DO_FFT
 #include "FFT.h"					// FFT library in case we also want to stream the FFT of the ADC data
+#endif
+
+#if !USE_NATIVE_WEBSOCKET_LIB
+#include <WebSocketsServer.h>		// WebSockets library
 #endif
 
 #if USE_ARDUINO_OTA
@@ -55,8 +59,11 @@ void handleFileUpload(AsyncWebServerRequest* request, String filename, size_t in
 bool renameFileUpload(String fileName);	// Renames the last file uploaded to the new file name provided
 void webServerWLANscan(AsyncWebServerRequest* request);	// Handles secret HTTP page that scans WLAN networks
 void webServerWLANsave(AsyncWebServerRequest* request);	// Handles secret HTTP page that saves new WLAN settings
-void webSocketGeophoneEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght);	// webSocketGeophone event callback function
-void webSocketConsoleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght);	// webSocketConsole event callback function
+#if USE_NATIVE_WEBSOCKET_LIB
+void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t * data, size_t len);	// webSocket event callback function
+#else
+void onWsEvent(WebSocketsServer* ws, uint8_t num, WStype_t type, uint8_t * payload, size_t len);	// webSocket event callback function
+#endif
 void consolePrintf(const char * format, ...);	// Log messages through webSocketConsole and Serial
 void processWebServer();	// "webServer.loop()" function: handle incoming OTA connections (if any), http requests and webSocket events
 

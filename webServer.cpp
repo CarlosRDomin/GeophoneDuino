@@ -6,7 +6,11 @@ bool sendBinDataAsString = false;
 bool sendFFT = true;
 char hostName[32];
 AsyncWebServer webServer(PORT_WEBSERVER);
-WebSocketsServer webSocketGeophone(PORT_WEBSOCKET_GEOPHONE), webSocketFFT(PORT_WEBSOCKET_FFT), webSocketConsole(PORT_WEBSOCKET_CONSOLE);
+#if USE_NATIVE_WEBSOCKET_LIB
+AsyncWebSocket wsGeophone("/geophone"), wsFFT("/fft"), wsConsole("/console");
+#else
+WebSocketsServer wsGeophone(PORT_WEBSOCKET_GEOPHONE), wsFFT(PORT_WEBSOCKET_FFT), wsConsole(PORT_WEBSOCKET_CONSOLE);
+#endif
 
 
 /***************************************************/
@@ -86,6 +90,26 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 
 	webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, CONT(TYPE_PLAIN), SF("Not found: ") + request->url()); });
 
+	#if USE_NATIVE_WEBSOCKET_LIB
+		wsGeophone.onEvent(onWsEvent);
+		webServer.addHandler(&wsGeophone);
+		wsConsole.onEvent(onWsEvent);
+		webServer.addHandler(&wsConsole);
+		#if DO_FFT
+			wsFFT.onEvent(onWsEvent);
+			webServer.addHandler(&wsFFT);
+		#endif
+	#else
+		wsGeophone.begin();
+		wsGeophone.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t len) { onWsEvent(&wsGeophone, num, type, payload, len); });
+		wsConsole.begin();
+		wsConsole.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t len) { onWsEvent(&wsConsole, num, type, payload, len); });
+		#if DO_FFT
+			wsFFT.begin();
+			wsFFT.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t len) { onWsEvent(&wsFFT, num, type, payload, len); });
+		#endif
+	#endif
+
 	webServer.begin();
 
 	// Also, setup Arduino's OTA (only works from their IDE)
@@ -121,12 +145,6 @@ void setupWebServer() {	// Initializes hostName, mDNS, HTTP server, OTA methods 
 		});
 		ArduinoOTA.begin();
 	#endif
-	
-	webSocketFFT.begin();
-	webSocketGeophone.begin();
-	webSocketGeophone.onEvent(webSocketGeophoneEvent);
-	webSocketConsole.begin();
-	webSocketConsole.onEvent(webSocketConsoleEvent);
 }
 
 
@@ -219,36 +237,30 @@ void webServerWLANsave(AsyncWebServerRequest* request) {	// Handles secret HTTP 
 	request->send(response);
 }
 
-void webSocketGeophoneEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {	// webSocketGeophone event callback function
-	IPAddress ip;
-	switch(type) {
-	case WStype_ERROR:
-		consolePrintF("[WebSocketGeophone %u] Error: %s\n", num, payload);
+#if USE_NATIVE_WEBSOCKET_LIB
+void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t * data, size_t len) {	// webSocket event callback function
+	switch (type) {
+	case  WS_EVT_CONNECT:
+		consolePrintF("[WebSocket '%s'] Client connected from %s:%d (clientId %u)\n", server->url(), client->remoteIP().toString().c_str(), client->remotePort(), client->id());
+		client->text(SOFT_AP_SSID);	// send message to client to confirm connection ok
 		break;
-	case WStype_DISCONNECTED:
-		consolePrintF("[WebSocketGeophone %u] Disconnected!\n", num);
-		break;
-	case WStype_CONNECTED:
-		ip = webSocketGeophone.remoteIP(num);
-		consolePrintF("[WebSocketGeophone %u] Connected from %d.%d.%d.%d, URL %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-		webSocketGeophone.broadcastTXT(SOFT_AP_SSID);	// send message to client to confirm connection ok
-		break;
-	case WStype_TEXT:
-		consolePrintF("[WebSocketGeophone %u] Rx text message: %s\n", num, payload);
-		break;
-	case WStype_BIN:
-		consolePrintF("[WebSocketGeophone %u] Rx binary message:\n", num);
-		hexdump(payload, lenght);
-		break;
+	case WS_EVT_ERROR:
+    	consolePrintf("[WebSocket '%s'] ClientId %u error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
+    	break;
+    default:
+    	break;
 	}
 }
-
-void webSocketConsoleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {	// webSocketConsole event callback function
+#else
+void onWsEvent(WebSocketsServer* ws, uint8_t num, WStype_t type, uint8_t * payload, size_t len) {	// webSocket event callback function
 	switch(type) {
 	case WStype_CONNECTED:
-		webSocketConsole.broadcastTXT("Connected");	// send message to client to confirm connection ok
+		consolePrintF("[WebSocket '%s'] Client connected from %s (clientID %u)\n", payload, ws->remoteIP(num).toString().c_str(), num);
+		ws->broadcastTXT(SOFT_AP_SSID);	// send message to client to confirm connection ok
 		break;
 	case WStype_ERROR:
+		consolePrintF("[WebSocket] ClientID %u error: %s\n", num, payload);
+		break;
 	case WStype_DISCONNECTED:
 	case WStype_TEXT:
 	case WStype_BIN:
@@ -256,14 +268,19 @@ void webSocketConsoleEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t
 		break;
 	}
 }
+#endif
 
 void consolePrintf(const char * format, ...) {	// Log messages through webSocketConsole and Serial
 	char buf[1024];
 	va_list args;
     va_start(args, format);
-    vsnprintf(buf, sizeof(buf), format, args);
+    size_t len = vsnprintf(buf, sizeof(buf), format, args);
     va_end(args);
-	webSocketConsole.broadcastTXT(buf);
+    #if USE_NATIVE_WEBSOCKET_LIB
+    	wsConsole.textAll(buf, len);
+    #else
+    	wsConsole.broadcastTXT(buf, len);
+    #endif
 	Serial.printf(buf);
 }
 
@@ -272,7 +289,7 @@ void processWebServer() {	// "webServer.loop()" function: handle incoming OTA co
 	static uint32_t last_t_sec = 0;
 	if (t_sec != last_t_sec) {	// Every second, log that we are alive
 		last_t_sec = t_sec;
-		//consolePrintF("Still alive (t=%3d:%02d'%02d\"); HEAP: %5d B\n", t_hr, t_min, t_sec, ESP.getFreeHeap());
+		consolePrintF("Still alive (t=%3d:%02d'%02d\"); HEAP: %5d B\n", t_hr, t_min, t_sec, ESP.getFreeHeap());
 	}
 
 	if (geophone_buf_got_full) {
@@ -286,30 +303,50 @@ void processWebServer() {	// "webServer.loop()" function: handle incoming OTA co
 			}
 			strWebSocket += "]";
 
-			webSocketGeophone.broadcastTXT(strWebSocket);
+			#if USE_NATIVE_WEBSOCKET_LIB
+				wsGeophone.textAll(strWebSocket);
+			#else
+				wsGeophone.broadcastTXT(strWebSocket);
+			#endif
 			strWebSocket = String();
 		} else {
-			webSocketGeophone.broadcastBIN(reinterpret_cast<uint8_t*>(geophone_buf[buf_id]), sizeof(uint16_t)*GEOPHONE_BUF_SIZE);
+			#if USE_NATIVE_WEBSOCKET_LIB
+				wsGeophone.binaryAll(reinterpret_cast<uint8_t*>(geophone_buf[buf_id]), sizeof(geophone_buf[0]));
+			#else
+				wsGeophone.broadcastBIN(reinterpret_cast<uint8_t*>(geophone_buf[buf_id]), sizeof(geophone_buf[0]));
+			#endif
 		}
 
-		performFFT(buf_id);
+		#if DO_FFT
+			performFFT(buf_id);
+	
+			if (sendBinDataAsString) {
+				String strWebSocket = "[" + String(fft_real[0]);
+				for (uint16_t i=1; i<=N_FFT/2; ++i) {
+					strWebSocket += "," + String(fft_real[i]);
+				}
+				strWebSocket += "]";
 
-		if (sendBinDataAsString) {
-			String strWebSocket = "[" + String(fft_real[0]);
-			for (uint16_t i=1; i<=N_FFT/2; ++i) {
-				strWebSocket += "," + String(fft_real[i]);
+				#if USE_NATIVE_WEBSOCKET_LIB
+					wsFFT.textAll(strWebSocket);
+				#else
+					wsFFT.broadcastTXT(strWebSocket);
+				#endif
+				strWebSocket = String();
+			} else {
+				#if USE_NATIVE_WEBSOCKET_LIB
+					wsFFT.binaryAll(reinterpret_cast<uint8_t*>(fft_real), sizeof(fft_real[0])*(1 + N_FFT/2));	// FFT is symmetrical, no need to send the 2nd half of the buffer, only [0 - N_FFT/2])
+				#else
+					wsFFT.broadcastBIN(reinterpret_cast<uint8_t*>(fft_real), sizeof(fft_real[0])*(1 + N_FFT/2));	// FFT is symmetrical, no need to send the 2nd half of the buffer, only [0 - N_FFT/2])
+				#endif
 			}
-			strWebSocket += "]";
-
-			webSocketFFT.broadcastTXT(strWebSocket);
-			strWebSocket = String();
-		} else {
-			webSocketFFT.broadcastBIN(reinterpret_cast<uint8_t*>(fft_real), sizeof(double)*(1 + N_FFT/2));
-		}
+		#endif
 	}
-	webSocketFFT.loop();
-	webSocketGeophone.loop();
-	webSocketConsole.loop();
+	#if !USE_NATIVE_WEBSOCKET_LIB && WEBSOCKETS_NETWORK_TYPE!=NETWORK_ESP8266_ASYNC
+		wsFFT.loop();
+		wsGeophone.loop();
+		wsConsole.loop();
+	#endif
 
 	if (shouldReboot) ESP.restart();	// AsyncWebServer doesn't suggest rebooting from async callbacks, so we set a flag and reboot from here :)
 	
